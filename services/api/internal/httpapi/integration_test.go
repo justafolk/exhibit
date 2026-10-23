@@ -6,14 +6,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http/httptest"
+	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	database "github.com/justafolk/exhibit/db"
+	"github.com/justafolk/exhibit/services/api/internal/auth"
 	"github.com/justafolk/exhibit/services/api/internal/store"
 )
 
@@ -58,9 +60,48 @@ func TestPostgresLifecycle(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	h := Server{Store: data}.Handler()
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest("GET", "/api/v1/runs", nil))
+
+	h := Server{Store: data, Identity: data}.Handler()
+	if rec := call(h, "GET", "/api/v1/runs", "", nil, ""); rec.Code != 401 {
+		t.Fatal("unauthenticated database read")
+	}
+	if rec := call(h, "POST", "/api/v1/auth/demo", "{}", nil, ""); rec.Code != 404 {
+		t.Fatal("database exposes sample login")
+	}
+	password := "test-only-private-password"
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"alpha", "bravo"} {
+		account := store.Account{Identity: store.Identity{User: store.User{ID: id, Email: id + "@example.com", Name: id}, Workspace: store.Workspace{ID: id, Name: id, Role: "owner"}}, PasswordHash: hash}
+		if err := data.Bootstrap(ctx, account); err != nil {
+			t.Fatal(err)
+		}
+	}
+	login := func(email, password string) (*http.Cookie, Session) {
+		t.Helper()
+		body, _ := json.Marshal(map[string]string{"email": email, "password": password})
+		rec := call(h, "POST", "/api/v1/auth/login", string(body), nil, "")
+		if rec.Code != 200 {
+			t.Fatalf("login %d %s", rec.Code, rec.Body)
+		}
+		var session Session
+		if err := json.Unmarshal(rec.Body.Bytes(), &session); err != nil {
+			t.Fatal(err)
+		}
+		return rec.Result().Cookies()[0], session
+	}
+	alpha, session := login("alpha@example.com", password)
+	bravo, _ := login("bravo@example.com", password)
+	// New owners do not inherit records assigned to the quarantined legacy workspace.
+	if rec := call(h, "GET", "/api/v1/runs", "", alpha, ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"runs":[]`) {
+		t.Fatalf("legacy records exposed: %s", rec.Body)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE evidence_runs SET workspace_id='alpha' WHERE id='exh-1042'`); err != nil {
+		t.Fatal(err)
+	}
+	rec := call(h, "GET", "/api/v1/runs", "", alpha, "")
 	var list struct {
 		Mode string      `json:"mode"`
 		Runs []store.Run `json:"runs"`
@@ -68,16 +109,64 @@ func TestPostgresLifecycle(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil {
 		t.Fatal(err)
 	}
-	if rec.Code != 200 || list.Mode != "postgres" || len(list.Runs) != len(store.Samples()) {
+	if rec.Code != 200 || list.Mode != "postgres" || len(list.Runs) != 1 || !list.Runs[0].Sample {
 		t.Fatalf("unexpected API response %d %s", rec.Code, rec.Body)
 	}
-	for _, run := range list.Runs {
-		if !run.Sample {
-			t.Fatal("seed data must be labelled")
+	if rec := call(h, "GET", "/api/v1/runs/exh-1042", "", bravo, ""); rec.Code != 404 {
+		t.Fatal("another workspace read a run")
+	}
+	if _, err := data.List(ctx); err != store.ErrForbidden {
+		t.Fatal("unscoped query accepted")
+	}
+	if _, err := data.Get(store.WithWorkspace(ctx, "alpha"), "exh-1042"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := data.Get(store.WithWorkspace(ctx, "bravo"), "exh-1042"); err != store.ErrNotFound {
+		t.Fatal("store tenant predicate absent")
+	}
+	setup := `{"repository":"acme/private","stagingUrl":"https://staging.example.com","testTenant":"alpha-test","runbookRef":"agents/runbook.yaml@0000000000000000000000000000000000000001"}`
+	if rec := call(h, "PUT", "/api/v1/setup", setup, alpha, session.CSRFToken); rec.Code != 200 {
+		t.Fatalf("save setup: %d %s", rec.Code, rec.Body)
+	}
+	// Reconstruct HTTP handler to prove the session/setup survive process-local state.
+	h = Server{Store: data, Identity: data}.Handler()
+	if rec := call(h, "GET", "/api/v1/setup", "", alpha, ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), "acme/private") {
+		t.Fatal("setup/session not durable")
+	}
+	if rec := call(h, "GET", "/api/v1/setup", "", bravo, ""); strings.Contains(rec.Body.String(), "acme/private") {
+		t.Fatal("setup leaked")
+	}
+	if _, err := pool.Exec(ctx, `UPDATE workspace_memberships SET role='viewer' WHERE user_id='alpha'`); err != nil {
+		t.Fatal(err)
+	}
+	if rec := call(h, "PUT", "/api/v1/setup", setup, alpha, session.CSRFToken); rec.Code != 403 {
+		t.Fatal("membership change not applied to existing session")
+	}
+	if rec := call(h, "POST", "/api/v1/contracts/evaluate", "{}", alpha, session.CSRFToken); rec.Code != 403 {
+		t.Fatal("viewer evaluated contract")
+	}
+	if rec := call(h, "POST", "/api/v1/auth/logout", "{}", alpha, session.CSRFToken); rec.Code != 200 {
+		t.Fatal("logout failed")
+	}
+	if rec := call(h, "GET", "/api/v1/auth/session", "", alpha, ""); rec.Code != 401 {
+		t.Fatal("revoked session accepted")
+	}
+	if _, err := pool.Exec(ctx, `UPDATE sessions SET expires_at=now()-interval '1 second'`); err != nil {
+		t.Fatal(err)
+	}
+	if rec := call(h, "GET", "/api/v1/runs", "", bravo, ""); rec.Code != 401 {
+		t.Fatal("expired database session accepted")
+	}
+	for _, email := range []string{"alpha@example.com", "unknown@example.com"} {
+		body, _ := json.Marshal(map[string]string{"email": email, "password": "incorrect"})
+		rec := call(h, "POST", "/api/v1/auth/login", string(body), nil, "")
+		if rec.Code != 401 || !strings.Contains(rec.Body.String(), "email or password is incorrect") {
+			t.Fatal("credential failure discloses account existence")
 		}
 	}
-	if _, err := data.Get(ctx, "exh-1042"); err != nil {
-		t.Fatal(err)
+	var count int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM sessions WHERE token_hash=$1`, bravo.Value).Scan(&count); err != nil || count != 0 {
+		t.Fatal("raw session token stored")
 	}
 	if _, err := pool.Exec(ctx, "UPDATE schema_migrations SET checksum='tampered'"); err != nil {
 		t.Fatal(err)

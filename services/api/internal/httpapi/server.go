@@ -18,9 +18,12 @@ import (
 )
 
 type Server struct {
-	Store     store.Store
-	CommitSHA string
-	StaticDir string
+	Store         store.Store
+	CommitSHA     string
+	StaticDir     string
+	Identity      store.IdentityStore
+	SecureCookies bool
+	PublicOrigin  string
 }
 
 func respond(w http.ResponseWriter, status int, body any) {
@@ -32,7 +35,11 @@ func failure(w http.ResponseWriter, status int, message string) {
 	respond(w, status, map[string]string{"error": message})
 }
 func (s Server) Handler() http.Handler {
+	if s.Identity == nil && s.Store.Mode() == "demo" {
+		s.Identity = store.NewMemoryIdentity()
+	}
 	mux := http.NewServeMux()
+	s.registerIdentity(mux)
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, map[string]string{"status": "ok"}) })
 	mux.HandleFunc("GET /api/readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
@@ -72,6 +79,9 @@ func (s Server) Handler() http.Handler {
 		respond(w, 200, run)
 	})
 	mux.HandleFunc("POST /api/v1/contracts/evaluate", func(w http.ResponseWriter, r *http.Request) {
+		if !editor(w, r) {
+			return
+		}
 		mediaType, _, mediaErr := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		if mediaErr != nil || mediaType != "application/json" {
 			failure(w, 400, "Content-Type must be application/json")
@@ -110,6 +120,7 @@ func (s Server) Handler() http.Handler {
 			files.ServeHTTP(w, r)
 		})
 	}
+	protected := s.authenticated(mux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "same-origin")
@@ -119,6 +130,6 @@ func (s Server) Handler() http.Handler {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
-		mux.ServeHTTP(w, r.WithContext(ctx))
+		protected.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
