@@ -272,6 +272,42 @@ func TestPostgresLifecycle(t *testing.T) {
 	if err != nil || latest.Name != "Concurrent name" || latest.Cleanup != "Concurrent cleanup" {
 		t.Fatal("concurrent patch overwrote an omitted field")
 	}
+
+	runBefore := call(h, "GET", "/api/v1/runs/exh-1042", "", alpha, "").Body.String()
+	recordingBody := strings.Replace(recordingJSON, `"runId":""`, `"runId":"exh-1042"`, 1)
+	if rec := call(h, "POST", "/api/v1/recordings", recordingBody, bravo, bravoSession.CSRFToken); rec.Code != 404 {
+		t.Fatalf("foreign run attached: %d %s", rec.Code, rec.Body)
+	}
+	savedRecording := call(h, "POST", "/api/v1/recordings", recordingBody, alpha, session.CSRFToken)
+	if savedRecording.Code != 201 {
+		t.Fatalf("recording not saved: %d %s", savedRecording.Code, savedRecording.Body)
+	}
+	var recording store.Recording
+	if err := json.Unmarshal(savedRecording.Body.Bytes(), &recording); err != nil {
+		t.Fatal(err)
+	}
+	if recording.Verification != "unverified" || recording.Origin != "manual" || recording.MediaStored || recording.CreatedBy != "alpha" {
+		t.Fatal("recording provenance invented")
+	}
+	if runAfter := call(h, "GET", "/api/v1/runs/exh-1042", "", alpha, "").Body.String(); runBefore != runAfter {
+		t.Fatal("manual metadata modified run verdict")
+	}
+	h = Server{Store: data, Identity: data}.Handler()
+	if rec := call(h, "GET", "/api/v1/recordings/"+recording.ID, "", alpha, ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), recording.SHA256) {
+		t.Fatal("recording not durable")
+	}
+	if rec := call(h, "GET", "/api/v1/recordings/"+recording.ID, "", bravo, ""); rec.Code != 404 {
+		t.Fatal("recording leaked")
+	}
+	if rec := call(h, "GET", "/api/v1/recordings", "", bravo, ""); !strings.Contains(rec.Body.String(), `"recordings":[]`) {
+		t.Fatal("foreign recording appeared in list")
+	}
+	if rec := call(h, "GET", "/api/v1/activity", "", alpha, ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), recording.ID) {
+		t.Fatal("recording authorship missing")
+	}
+	if rec := call(h, "GET", "/api/v1/activity", "", bravo, ""); strings.Contains(rec.Body.String(), recording.ID) {
+		t.Fatal("recording authorship leaked")
+	}
 	if _, err := pool.Exec(ctx, `UPDATE workspace_memberships SET role='viewer' WHERE user_id='alpha'`); err != nil {
 		t.Fatal(err)
 	}
@@ -287,6 +323,13 @@ func TestPostgresLifecycle(t *testing.T) {
 	}
 	if rec := call(h, "PUT", "/api/v1/contract-draft", "{}", alpha, session.CSRFToken); rec.Code != 403 {
 		t.Fatal("viewer changed draft")
+	}
+
+	if call(h, "POST", "/api/v1/recordings", recordingBody, alpha, session.CSRFToken).Code != 403 {
+		t.Fatal("viewer saved recording metadata")
+	}
+	if call(h, "GET", "/api/v1/recordings/"+recording.ID, "", alpha, "").Code != 200 {
+		t.Fatal("viewer could not read recording metadata")
 	}
 	if rec := call(h, "POST", "/api/v1/auth/logout", "{}", alpha, session.CSRFToken); rec.Code != 200 {
 		t.Fatal("logout failed")
