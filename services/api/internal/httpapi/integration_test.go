@@ -94,6 +94,20 @@ func TestPostgresLifecycle(t *testing.T) {
 	}
 	alpha, session := login("alpha@example.com", password)
 	bravo, _ := login("bravo@example.com", password)
+	// Password reauthentication issues a different cookie and revokes the old token.
+	previousAlpha := alpha
+	rotation := call(h, "POST", "/api/v1/auth/login", `{"email":"alpha@example.com","password":"test-only-private-password"}`, alpha, "")
+	if rotation.Code != 200 {
+		t.Fatalf("password rotation failed: %d", rotation.Code)
+	}
+	alpha = rotation.Result().Cookies()[0]
+	if err := json.Unmarshal(rotation.Body.Bytes(), &session); err != nil {
+		t.Fatal(err)
+	}
+	if alpha.Value == previousAlpha.Value || call(h, "GET", "/api/v1/auth/session", "", previousAlpha, "").Code != 401 {
+		t.Fatal("password reauthentication retained prior session")
+	}
+
 	// New owners do not inherit records assigned to the quarantined legacy workspace.
 	if rec := call(h, "GET", "/api/v1/runs", "", alpha, ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"runs":[]`) {
 		t.Fatalf("legacy records exposed: %s", rec.Body)
@@ -153,6 +167,33 @@ func TestPostgresLifecycle(t *testing.T) {
 	if rec := call(h, "PUT", "/api/v1/setup", setup, alpha, session.CSRFToken); rec.Code != 200 {
 		t.Fatalf("save setup: %d %s", rec.Code, rec.Body)
 	}
+
+	created := call(h, "POST", "/api/v1/flows", flowJSON, alpha, session.CSRFToken)
+	if created.Code != 201 {
+		t.Fatalf("create durable flow: %d %s", created.Code, created.Body)
+	}
+	var flow store.Flow
+	if err := json.Unmarshal(created.Body.Bytes(), &flow); err != nil {
+		t.Fatal(err)
+	}
+	if flow.UpdatedBy != "alpha" || flow.UpdatedAt.IsZero() {
+		t.Fatal("missing flow authorship")
+	}
+	if rec := call(h, "PATCH", "/api/v1/flows/"+flow.ID, `{"name":"Updated checkout"}`, alpha, session.CSRFToken); rec.Code != 200 {
+		t.Fatal("durable flow update failed")
+	}
+	if rec := call(h, "GET", "/api/v1/flows/"+flow.ID, "", bravo, ""); rec.Code != 404 {
+		t.Fatal("flow crossed workspace")
+	}
+	bravoSessionRec := call(h, "GET", "/api/v1/auth/session", "", bravo, "")
+	var bravoSession Session
+	_ = json.Unmarshal(bravoSessionRec.Body.Bytes(), &bravoSession)
+	if rec := call(h, "PATCH", "/api/v1/flows/"+flow.ID, `{"name":"foreign"}`, bravo, bravoSession.CSRFToken); rec.Code != 404 {
+		t.Fatal("foreign flow mutation allowed")
+	}
+	if rec := call(h, "PUT", "/api/v1/contract-draft", `{"repository":"acme/prepared","headSha":"incomplete","flowIds":[]}`, alpha, session.CSRFToken); rec.Code != 200 {
+		t.Fatal("incomplete draft not stored")
+	}
 	// Reconstruct HTTP handler to prove the session/setup survive process-local state.
 	h = Server{Store: data, Identity: data}.Handler()
 	if rec := call(h, "GET", "/api/v1/setup", "", alpha, ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), "acme/private") {
@@ -160,6 +201,20 @@ func TestPostgresLifecycle(t *testing.T) {
 	}
 	if rec := call(h, "GET", "/api/v1/setup", "", bravo, ""); strings.Contains(rec.Body.String(), "acme/private") {
 		t.Fatal("setup leaked")
+	}
+
+	if rec := call(h, "GET", "/api/v1/flows/"+flow.ID, "", alpha, ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), "Updated checkout") {
+		t.Fatal("flow not durable")
+	}
+	if rec := call(h, "GET", "/api/v1/contract-draft", "", alpha, ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), "acme/prepared") {
+		t.Fatal("draft not durable")
+	}
+	if rec := call(h, "GET", "/api/v1/contract-draft", "", bravo, ""); strings.Contains(rec.Body.String(), "acme/prepared") {
+		t.Fatal("draft crossed workspace")
+	}
+	var events int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM configuration_events WHERE workspace_id='alpha' AND actor_id='alpha'`).Scan(&events); err != nil || events != 3 {
+		t.Fatalf("missing authorship events: %d %v", events, err)
 	}
 	if _, err := pool.Exec(ctx, `UPDATE workspace_memberships SET role='viewer' WHERE user_id='alpha'`); err != nil {
 		t.Fatal(err)
@@ -169,6 +224,13 @@ func TestPostgresLifecycle(t *testing.T) {
 	}
 	if rec := call(h, "POST", "/api/v1/contracts/evaluate", "{}", alpha, session.CSRFToken); rec.Code != 403 {
 		t.Fatal("viewer evaluated contract")
+	}
+
+	if rec := call(h, "PATCH", "/api/v1/flows/"+flow.ID, `{"name":"viewer write"}`, alpha, session.CSRFToken); rec.Code != 403 {
+		t.Fatal("viewer changed a flow")
+	}
+	if rec := call(h, "PUT", "/api/v1/contract-draft", "{}", alpha, session.CSRFToken); rec.Code != 403 {
+		t.Fatal("viewer changed draft")
 	}
 	if rec := call(h, "POST", "/api/v1/auth/logout", "{}", alpha, session.CSRFToken); rec.Code != 200 {
 		t.Fatal("logout failed")
@@ -192,6 +254,17 @@ func TestPostgresLifecycle(t *testing.T) {
 	var count int
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM sessions WHERE token_hash=$1`, bravo.Value).Scan(&count); err != nil || count != 0 {
 		t.Fatal("raw session token stored")
+	}
+
+	membershipCookie, _ := login("bravo@example.com", password)
+	if _, err := pool.Exec(ctx, `DELETE FROM workspace_memberships WHERE workspace_id='bravo' AND user_id='bravo'`); err != nil {
+		t.Fatal(err)
+	}
+	if call(h, "GET", "/api/v1/auth/session", "", membershipCookie, "").Code != 401 {
+		t.Fatal("removed membership retains session")
+	}
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM sessions WHERE user_id='bravo'`).Scan(&count); err != nil || count != 0 {
+		t.Fatal("membership removal did not revoke persisted sessions")
 	}
 	if _, err := pool.Exec(ctx, "UPDATE schema_migrations SET checksum='tampered'"); err != nil {
 		t.Fatal(err)

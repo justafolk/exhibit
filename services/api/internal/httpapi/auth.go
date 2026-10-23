@@ -220,7 +220,7 @@ func (s Server) registerIdentity(mux *http.ServeMux) {
 			failure(w, 400, "password sign-in requires a configured PostgreSQL workspace; use sample preview")
 			return
 		}
-		if len(input.Email) > 254 || len(input.Password) > 256 {
+		if len(input.Email) > 254 || strings.ContainsRune(input.Email, 0) || len(input.Password) > 256 {
 			failure(w, 400, "invalid credential length")
 			return
 		}
@@ -282,7 +282,7 @@ func (s Server) registerIdentity(mux *http.ServeMux) {
 			return
 		}
 		input.Name = strings.TrimSpace(input.Name)
-		if len(input.Name) < 1 || len(input.Name) > 100 {
+		if len(input.Name) < 1 || len(input.Name) > 100 || strings.ContainsRune(input.Name, 0) {
 			failure(w, 400, "workspace name must contain 1–100 bytes")
 			return
 		}
@@ -334,7 +334,7 @@ func validateSetup(s store.Setup) string {
 	if s.Repository != "" && !repositoryPattern.MatchString(s.Repository) {
 		return "repository must use owner/repository format"
 	}
-	if len(s.TestTenant) > 100 {
+	if len(s.TestTenant) > 100 || strings.ContainsRune(s.TestTenant, 0) {
 		return "test tenant must be at most 100 bytes"
 	}
 	if len(s.RunbookRef) > 512 || (s.RunbookRef != "" && !runbookPattern.MatchString(s.RunbookRef)) {

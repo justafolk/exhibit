@@ -169,3 +169,24 @@ func TestLoginAttemptsAreBounded(t *testing.T) {
 		t.Fatal("changing account bypassed IP attempt limit")
 	}
 }
+
+func TestConfiguredPublicOriginBehindProxy(t *testing.T) {
+	h := Server{Store: store.Demo{}, SecureCookies: true, PublicOrigin: "https://exhibit.example.com"}.Handler()
+	for _, origin := range []string{"https://exhibit.example.com", "https://attacker.example.com", "http://control-plane:8080"} {
+		req := httptest.NewRequest("POST", "http://control-plane:8080/api/v1/auth/demo", strings.NewReader("{}"))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Origin", origin)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		expected := 403
+		if origin == "https://exhibit.example.com" {
+			expected = 200
+		}
+		if rec.Code != expected {
+			t.Fatalf("origin %s returned %d", origin, rec.Code)
+		}
+		if expected == 200 && !rec.Result().Cookies()[0].Secure {
+			t.Fatal("proxy session missing Secure cookie")
+		}
+	}
+}

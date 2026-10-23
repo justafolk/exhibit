@@ -202,20 +202,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/flows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description At most 100 authored flow definitions in this workspace, sorted by updatedAt then id descending. Definitions are unapproved metadata, never execution authority. */
+        get: operations["listFlows"];
+        put?: never;
+        /** @description Owner/editor only; records actor and time. At most 100 definitions per workspace. */
+        post: operations["createFlow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/flows/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getFlow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** @description Owner/editor only. Supplied fields replace their current values; omitted fields remain unchanged. No approval or verdict is set. */
+        patch: operations["updateFlow"];
+        trace?: never;
+    };
+    "/api/v1/contract-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Workspace draft. An unsaved draft has blank strings, pullRequest 0, and empty flowIds. */
+        get: operations["getContractDraft"];
+        /** @description Owner/editor only. Replaces the shared workspace draft; omitted fields become empty. Bounded incomplete/invalid values can be saved for later evaluation. Actor and time are recorded; this never authorizes execution. */
+        put: operations["saveContractDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description Fields are optional so the evaluator can report missing information. */
+        /** @description Optional bounded fields for completeness evaluation or draft saving. Semantic-invalid values remain editable; all string limits are UTF-8 bytes and NUL is rejected. Supplied flow IDs are not resolved or approved by this evaluator. */
         EvidenceContract: {
-            /** @example acme/storefront */
+            /** @description Expected owner/repository; invalid bounded values report needs_info */
             repository?: string;
+            /** @description 0 is incomplete */
             pullRequest?: number;
+            /** @description Expected full lowercase 40-character SHA */
             headSha?: string;
-            /** @enum {string} */
-            changeKind?: "frontend" | "backend" | "fullstack" | "docs" | "migration";
-            /** @enum {string} */
-            environment?: "staging";
+            /** @description frontend, backend, fullstack, docs or migration */
+            changeKind?: string;
+            /** @description Only staging is eligible; other nonempty values evaluate not_testable */
+            environment?: string;
             flowIds?: string[];
             runbookRef?: string;
             testTenant?: string;
@@ -285,6 +340,55 @@ export interface components {
             testTenant: string;
             /** @description path@full-lowercase-40-character-commit-SHA, or empty */
             runbookRef: string;
+        };
+        /** @description Authored metadata only. All string limits are UTF-8 byte limits; NUL is rejected. */
+        FlowInput: {
+            name: string;
+            description: string;
+            preconditions: string[];
+            assertions: string[];
+            cleanup: string;
+            runbookRef: string;
+        };
+        FlowPatch: {
+            name?: string;
+            description?: string;
+            preconditions?: string[];
+            assertions?: string[];
+            cleanup?: string;
+            runbookRef?: string;
+        };
+        Flow: {
+            name: string;
+            description: string;
+            preconditions: string[];
+            assertions: string[];
+            cleanup: string;
+            runbookRef: string;
+            id: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description Author user ID, not an approval */
+            updatedBy: string;
+        };
+        FlowList: {
+            flows: components["schemas"]["Flow"][];
+        };
+        /** @description Workspace-shared draft with empty defaults. Authorship is recorded separately; content does not grant execution authority. */
+        ContractDraft: {
+            /** @description Expected owner/repository; invalid bounded values report needs_info */
+            repository: string;
+            /** @description 0 is incomplete */
+            pullRequest: number;
+            /** @description Expected full lowercase 40-character SHA */
+            headSha: string;
+            /** @description frontend, backend, fullstack, docs or migration */
+            changeKind: string;
+            /** @description Only staging is eligible; other nonempty values evaluate not_testable */
+            environment: string;
+            flowIds: string[];
+            runbookRef: string;
+            testTenant: string;
         };
     };
     responses: {
@@ -919,6 +1023,368 @@ export interface operations {
                 content?: never;
             };
             /** @description Store unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listFlows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Workspace flow catalog */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlowList"];
+                };
+            };
+            /** @description Invalid or oversized input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Sign in required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Editor permission or CSRF check failed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Flow not found in this workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preparation store unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createFlow: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token; mutations also require same-origin Origin header. */
+                "X-CSRF-Token": components["parameters"]["CSRFToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FlowInput"];
+            };
+        };
+        responses: {
+            /** @description Saved authored flow */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Flow"];
+                };
+            };
+            /** @description Invalid or oversized input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Sign in required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Editor permission or CSRF check failed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Flow not found in this workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Workspace flow capacity reached */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preparation store unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getFlow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authored flow */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Flow"];
+                };
+            };
+            /** @description Invalid or oversized input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Sign in required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Editor permission or CSRF check failed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Flow not found in this workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preparation store unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateFlow: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token; mutations also require same-origin Origin header. */
+                "X-CSRF-Token": components["parameters"]["CSRFToken"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FlowPatch"];
+            };
+        };
+        responses: {
+            /** @description Updated authored flow */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Flow"];
+                };
+            };
+            /** @description Invalid or oversized input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Sign in required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Editor permission or CSRF check failed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Flow not found in this workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preparation store unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getContractDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Saved or empty draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractDraft"];
+                };
+            };
+            /** @description Invalid or oversized input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Sign in required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Editor permission or CSRF check failed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Flow not found in this workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preparation store unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    saveContractDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token; mutations also require same-origin Origin header. */
+                "X-CSRF-Token": components["parameters"]["CSRFToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvidenceContract"];
+            };
+        };
+        responses: {
+            /** @description Saved draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractDraft"];
+                };
+            };
+            /** @description Invalid or oversized input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Sign in required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Editor permission or CSRF check failed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Flow not found in this workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preparation store unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;

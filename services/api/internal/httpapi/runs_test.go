@@ -13,7 +13,7 @@ import (
 func TestRunQueryValidation(t *testing.T) {
 	h := Server{Store: store.Demo{}}.Handler()
 	cookie, _ := demoLogin(t, h)
-	for _, query := range []string{"q=a&q=b", "status=failed&status=running", "unknown=value", "status=all", "status=invalid", "q=%FF", "q=%ZZ", "q=" + strings.Repeat("x", 201)} {
+	for _, query := range []string{"q=a&q=b", "status=failed&status=running", "unknown=value", "status=all", "status=invalid", "q=%FF", "q=%00", "q=%ZZ", "q=" + strings.Repeat("x", 201)} {
 		rec := call(h, "GET", "/api/v1/runs?"+query, "", cookie, "")
 		if rec.Code != 400 {
 			t.Fatalf("query %q: %d %s", query, rec.Code, rec.Body)

@@ -3,11 +3,13 @@ package store
 import (
 	"context"
 	"errors"
+	"github.com/justafolk/exhibit/services/api/internal/evidence"
 	"sync"
 	"time"
 )
 
 var ErrUnauthorized = errors.New("authentication required")
+var ErrCapacity = errors.New("workspace supports at most 100 flow definitions")
 var ErrForbidden = errors.New("workspace access required")
 
 type scopeKey struct{}
@@ -62,10 +64,12 @@ type MemoryIdentity struct {
 	mu       sync.Mutex
 	sessions map[string]memorySession
 	settings map[string]Setup
+	flows    map[string]map[string]Flow
+	drafts   map[string]evidence.Contract
 }
 
 func NewMemoryIdentity() *MemoryIdentity {
-	return &MemoryIdentity{sessions: map[string]memorySession{}, settings: map[string]Setup{}}
+	return &MemoryIdentity{sessions: map[string]memorySession{}, settings: map[string]Setup{}, flows: map[string]map[string]Flow{}, drafts: map[string]evidence.Contract{}}
 }
 func (m *MemoryIdentity) Account(context.Context, string) (Account, error) {
 	return Account{}, ErrUnauthorized
@@ -77,6 +81,8 @@ func (m *MemoryIdentity) SaveSession(_ context.Context, hash string, identity Id
 		if !value.Expires.After(time.Now()) {
 			delete(m.sessions, key)
 			delete(m.settings, value.Identity.Workspace.ID)
+			delete(m.flows, value.Identity.Workspace.ID)
+			delete(m.drafts, value.Identity.Workspace.ID)
 		}
 	}
 	if len(m.sessions) >= 1000 {
@@ -99,6 +105,8 @@ func (m *MemoryIdentity) RevokeSession(_ context.Context, hash string) error {
 	defer m.mu.Unlock()
 	if value, ok := m.sessions[hash]; ok {
 		delete(m.settings, value.Identity.Workspace.ID)
+		delete(m.flows, value.Identity.Workspace.ID)
+		delete(m.drafts, value.Identity.Workspace.ID)
 	}
 	delete(m.sessions, hash)
 	return nil
