@@ -20,10 +20,14 @@ Mutations require an exact allowed origin and a session-bound CSRF token. Every 
 run query requires workspace scope; legacy records remain in an unclaimed sample workspace.
 Run filters apply before the latest-100 limit. Authored flow definitions and contract
 drafts have tenant ownership, bounded domain validation and actor/time metadata.
+Manual recording manifests live in PostgreSQL; original video stays browser-local.
+The server fixes their origin to `manual`, verification to `unverified`, and media storage
+to false. A workspace/run foreign key constrains optional run associations; saving a
+manifest never changes a run verdict. Recent authorship events are a tenant-scoped read model.
 There is no mutation endpoint that schedules customer execution.
 OpenAPI is the shared boundary; TypeScript types are generated and CI detects drift.
 
-PostgreSQL holds relational metadata and JSONB assertions. Artifacts will live in private
+PostgreSQL holds relational metadata and JSONB assertions. Trusted artifacts will live in private
 object storage with checksums, redaction gates and retention, not in database byte columns.
 Migrations are explicit, checksum-verified and transactionally serialized. They are never
 applied automatically on API startup. Sample seeding is loopback-only and idempotent.

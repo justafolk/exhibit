@@ -72,3 +72,23 @@ Customer execution requires a separately provisioned isolation boundary and trus
 GitHub identity, runbook approval, credentials and artifact collection. Until those
 services are connected, the workspace cannot execute customer PR code or issue new
 verified evidence. Keep the app private while completing those pilot prerequisites.
+
+## Recording studio
+
+Import a WebM or MP4, or choose **Record screen** and select a surface in your browser's
+sharing dialog. Capture is video-only, capped at five minutes; imports are limited to
+128 MiB and one hour. Browser support and screen-sharing permissions still apply.
+
+Give the walkthrough a name, mark key moments with chapters, and adjust framing,
+focus zoom and playback speed. These presentation controls leave original bytes intact.
+Download the original media and its JSON manifest, which includes the original SHA-256
+checksum and presentation settings.
+
+**Save metadata** stores the manifest in your workspace. It does not upload the video.
+Download the original before leaving the page; saved metadata cannot restore local media.
+Every manual recording remains unverified. A client-provided hash identifies declared
+bytes, not trusted execution, redaction or proof of the associated commit. Linking a
+recording to a run does not change that run's verdict.
+
+The API retains recent flow, draft and recording authorship activity. An activity
+view in Settings is not implemented in this checkpoint.

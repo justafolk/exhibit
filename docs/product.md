@@ -27,6 +27,10 @@ URL-preserved search and qualified Markdown exports support review. Owners are p
 email recovery and GitHub OAuth are not implemented. Setup records metadata without
 claiming GitHub connectivity, runbook approval or permission to execute.
 
+The recording studio captures or imports local video and adds chapters and presentation
+controls without altering original bytes. Workspace manifests remain manual and unverified;
+media is not uploaded. Neither recordings nor contract readiness can set a run verdict.
+
 ## Foundation acceptance
 
 A new contributor can clone, bootstrap and run a clearly labelled sample dashboard.
