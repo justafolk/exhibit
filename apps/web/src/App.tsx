@@ -1184,6 +1184,7 @@ export function App({ client = previewClient }: { client?: WorkspaceClient }) {
           {navigation.map((item) => (
             <a
               key={item.id}
+              onClick={() => setMobileOpen(false)}
               href={`#/${item.id}`}
               className={`nav-item ${page === item.id ? 'active' : ''}`}
               aria-current={page === item.id ? 'page' : undefined}
