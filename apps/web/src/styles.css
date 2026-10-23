@@ -1846,3 +1846,29 @@ th {
 .badge.failed {
   color: #a34343;
 }
+
+.report-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.report-actions .secondary {
+  font-size: 12px;
+}
+.export-message {
+  color: #356d51;
+  padding: 0 0 18px;
+  font-size: 12px;
+}
+.all-statuses {
+  flex-wrap: wrap;
+}
+@media (max-width: 700px) {
+  .report-actions {
+    margin-top: 16px;
+  }
+  .all-statuses {
+    justify-content: flex-start;
+  }
+}

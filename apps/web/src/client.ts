@@ -16,7 +16,7 @@ export interface WorkspaceClient {
   login(email: string, password: string): Promise<Session>;
   demo(): Promise<Session>;
   logout(): Promise<void>;
-  listRuns(): Promise<RunList>;
+  listRuns(filters?: { q?: string; status?: Run['status'] }): Promise<RunList>;
   getRun(id: string): Promise<Run>;
   getSetup(): Promise<Setup>;
   saveSetup(setup: Setup): Promise<Setup>;
@@ -96,7 +96,12 @@ export const apiClient: WorkspaceClient = {
     await request('/auth/logout', 'POST', {});
     csrfToken = '';
   },
-  listRuns: () => request<RunList>('/runs'),
+  listRuns: (filters) => {
+    const params = new URLSearchParams();
+    if (filters?.q) params.set('q', filters.q);
+    if (filters?.status) params.set('status', filters.status);
+    return request<RunList>(`/runs${params.size ? `?${params}` : ''}`);
+  },
   getRun: (id) => request<Run>(`/runs/${encodeURIComponent(id)}`),
   getSetup: () => request<Setup>('/setup'),
   saveSetup: (setup) => request<Setup>('/setup', 'PUT', setup),

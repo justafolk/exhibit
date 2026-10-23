@@ -1,0 +1,181 @@
+import { useEffect, useState } from 'react';
+import type { Run, RunList, WorkspaceClient } from '../client';
+import { Empty, Icon, Notice, PageHeading, statusLabels } from '../ui';
+import { RunTable } from '../components/RunTable';
+import { message } from '../navigation';
+
+const statuses = Object.keys(statusLabels) as Run['status'][];
+function initialFilters(): { q: string; status: Run['status'] | '' } {
+  const params = new URLSearchParams(window.location.hash.split('?')[1]);
+  const status = params.get('status');
+  return {
+    q: params.get('q') || '',
+    status: statuses.includes(status as Run['status'])
+      ? (status as Run['status'])
+      : '',
+  };
+}
+function filterQuery(q: string, status: string) {
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (status) params.set('status', status);
+  return params.size ? `?${params}` : '';
+}
+
+export function Runs({
+  client,
+  data,
+}: {
+  client: WorkspaceClient;
+  data: RunList;
+}) {
+  const initial = initialFilters();
+  const [query, setQuery] = useState(initial.q);
+  const [filter, setFilter] = useState(initial.status);
+  const [result, setResult] = useState<RunList>(data);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+  const [revision, setRevision] = useState(0);
+  const reportQuery = filterQuery(query, filter);
+  useEffect(() => {
+    let active = true;
+    setPending(true);
+    setError('');
+    const timer = window.setTimeout(
+      () => {
+        client
+          .listRuns({ q: query, status: filter || undefined })
+          .then((value) => {
+            if (active) setResult(value);
+          })
+          .catch((reason) => {
+            if (active) setError(message(reason));
+          })
+          .finally(() => {
+            if (active) setPending(false);
+          });
+      },
+      query ? 180 : 0,
+    );
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [client, query, filter, revision]);
+  function update(q: string, status: typeof filter, push = false) {
+    const next = `#/runs${filterQuery(q, status)}`;
+    if (push) window.history.pushState(null, '', next);
+    else window.history.replaceState(null, '', next);
+    setQuery(q);
+    setFilter(status);
+  }
+  return (
+    <>
+      <PageHeading
+        title="Evidence runs"
+        description="Review observed behavior against the exact pull request commit."
+        action={
+          <button
+            className="secondary"
+            disabled={pending}
+            onClick={() => setRevision((value) => value + 1)}
+          >
+            {pending ? 'Refreshing…' : 'Refresh runs'}
+          </button>
+        }
+      />
+      <section className="panel">
+        <div className="runs-toolbar">
+          <div className="filter-tabs all-statuses" aria-label="Filter runs">
+            <button
+              aria-pressed={!filter}
+              className={!filter ? 'selected' : ''}
+              onClick={() => update(query, '', true)}
+            >
+              All runs
+            </button>
+            {statuses.map((status) => (
+              <button
+                key={status}
+                aria-pressed={filter === status}
+                className={filter === status ? 'selected' : ''}
+                onClick={() => update(query, status, true)}
+              >
+                {statusLabels[status]}
+              </button>
+            ))}
+          </div>
+          <label className="search-field">
+            <Icon name="search" size={16} />
+            <input
+              aria-label="Search runs"
+              placeholder="Title, repository, PR, or full SHA…"
+              value={query}
+              maxLength={200}
+              onChange={(event) => update(event.target.value, filter)}
+            />
+          </label>
+        </div>
+        {error ? (
+          <div role="alert">
+            <Empty
+              title="Evidence is unavailable"
+              action={
+                <button
+                  className="secondary"
+                  onClick={() => setRevision((value) => value + 1)}
+                >
+                  Try again
+                </button>
+              }
+            >
+              {error}
+            </Empty>
+          </div>
+        ) : pending ? (
+          <div className="loading-state" role="status">
+            Finding matching evidence…
+          </div>
+        ) : result.runs.length ? (
+          <RunTable runs={result.runs} reportQuery={reportQuery} />
+        ) : (
+          <Empty
+            title={
+              query || filter ? 'No matching runs' : 'Your evidence starts here'
+            }
+            action={
+              query || filter ? (
+                <button
+                  className="secondary"
+                  onClick={() => update('', '', true)}
+                >
+                  Clear filters
+                </button>
+              ) : (
+                <a href="#/setup" className="secondary">
+                  Set up your workspace
+                </a>
+              )
+            }
+          >
+            {query || filter
+              ? 'Try another search or change the outcome filter.'
+              : 'No runs are stored yet. Repository setup is the next step.'}
+          </Empty>
+        )}
+        <div className="panel-foot split">
+          <span>
+            {pending
+              ? 'Loading matching runs…'
+              : `${result.runs.length} matching runs · latest 100 maximum`}
+          </span>
+          <span>Staging evidence</span>
+        </div>
+      </section>
+      <Notice>
+        A complete contract is a starting point. Only a trusted execution with
+        deterministic assertions can produce verified evidence.
+      </Notice>
+    </>
+  );
+}
