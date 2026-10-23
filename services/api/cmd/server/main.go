@@ -21,6 +21,7 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	var data store.Store = store.Demo{}
+	var identity store.IdentityStore
 	mode := os.Getenv("EXHIBIT_STORE")
 	if mode == "" {
 		mode = "demo"
@@ -44,6 +45,7 @@ func run() error {
 		}
 		defer pool.Close()
 		data = store.Postgres{Pool: pool}
+		identity = store.Postgres{Pool: pool}
 	default:
 		return errors.New("EXHIBIT_STORE must be demo or postgres")
 	}
@@ -51,7 +53,17 @@ func run() error {
 	if addr == "" {
 		addr = "127.0.0.1:8080"
 	}
-	server := &http.Server{Addr: addr, Handler: httpapi.Server{Store: data, CommitSHA: commitSHA, StaticDir: os.Getenv("STATIC_DIR")}.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+	secureCookies := mode == "postgres"
+	switch os.Getenv("EXHIBIT_COOKIE_SECURE") {
+	case "true":
+		secureCookies = true
+	case "false":
+		secureCookies = false
+	case "":
+	default:
+		return errors.New("EXHIBIT_COOKIE_SECURE must be true or false")
+	}
+	server := &http.Server{Addr: addr, Handler: httpapi.Server{Store: data, Identity: identity, SecureCookies: secureCookies, PublicOrigin: os.Getenv("EXHIBIT_PUBLIC_ORIGIN"), CommitSHA: commitSHA, StaticDir: os.Getenv("STATIC_DIR")}.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 	result := make(chan error, 1)
 	go func() {
 		slog.Info("exhibit API listening", "address", addr, "mode", mode)

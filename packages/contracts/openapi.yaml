@@ -1,8 +1,10 @@
 openapi: 3.1.0
 info:
   title: Exhibit API
-  version: 0.1.0
-  description: Private MVP foundation. Contract evaluation checks completeness only; it never authorizes execution.
+  version: 0.2.0
+  description: >-
+    Private workspace API. Authenticated metadata and contract completeness never authorize
+    execution. Demo sessions only read sample evidence and ephemeral settings.
 paths:
   /api/healthz:
     get:
@@ -10,6 +12,7 @@ paths:
       responses:
         '200':
           description: Process is alive
+      security: []
   /api/readyz:
     get:
       operationId: ready
@@ -18,12 +21,14 @@ paths:
           description: Store is reachable
         '503':
           description: Store is unavailable
+      security: []
   /api/version:
     get:
       operationId: version
       responses:
         '200':
           description: Build provenance
+      security: []
   /api/v1/runs:
     get:
       operationId: listRuns
@@ -34,6 +39,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RunList'
+        '401':
+          description: Sign in required
         '503':
           $ref: '#/components/responses/Unavailable'
   /api/v1/runs/{id}:
@@ -43,7 +50,8 @@ paths:
         - in: path
           name: id
           required: true
-          schema: { type: string }
+          schema:
+            type: string
       responses:
         '200':
           description: Run details
@@ -51,6 +59,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Run'
+        '401':
+          description: Sign in required
         '404':
           description: Run does not exist
         '503':
@@ -73,6 +83,212 @@ paths:
                 $ref: '#/components/schemas/Evaluation'
         '400':
           description: Invalid or oversized JSON (64 KiB maximum)
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      description: Owner/editor only. Contract completeness is not execution authority.
+  /api/v1/auth/login:
+    post:
+      operationId: login
+      security: []
+      description: Private operator-provisioned account. Requires same-origin Origin header. Rate limited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Invalid input
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+        '429':
+          description: Rate limited; retry later
+        '503':
+          description: Store unavailable
+  /api/v1/auth/demo:
+    post:
+      operationId: startDemoSession
+      security: []
+      description: >-
+        Only available in demo mode; isolated ephemeral sample workspace. Requires same-origin
+        Origin header.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmptyObject'
+      responses:
+        '200':
+          description: Sample session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Invalid input
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+        '404':
+          description: Demo unavailable in real mode
+        '429':
+          description: Rate limited
+        '503':
+          description: Store unavailable
+  /api/v1/auth/session:
+    get:
+      operationId: getSession
+      responses:
+        '200':
+          description: Current session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Invalid input
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+        '503':
+          description: Store unavailable
+  /api/v1/auth/logout:
+    post:
+      operationId: logout
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmptyObject'
+      responses:
+        '200':
+          description: Session revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - signedOut
+                properties:
+                  signedOut:
+                    type: boolean
+        '400':
+          description: Invalid input
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+        '503':
+          description: Store unavailable
+  /api/v1/workspace:
+    get:
+      operationId: getWorkspace
+      responses:
+        '200':
+          description: Current workspace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+        '400':
+          description: Invalid input
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+        '503':
+          description: Store unavailable
+    patch:
+      operationId: renameWorkspace
+      description: Owner only
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceNameInput'
+      responses:
+        '200':
+          description: Saved workspace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+        '400':
+          description: Invalid input
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+        '503':
+          description: Store unavailable
+  /api/v1/setup:
+    get:
+      operationId: getSetup
+      responses:
+        '200':
+          description: Saved setup; empty strings indicate missing metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Setup'
+        '400':
+          description: Invalid input
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+        '503':
+          description: Store unavailable
+    put:
+      operationId: saveSetup
+      description: >-
+        Owner only. Saves preparation metadata, never an installation or run approval. Demo values
+        expire with the session.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Setup'
+      responses:
+        '200':
+          description: Saved metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Setup'
+        '400':
+          description: Invalid input
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+        '503':
+          description: Store unavailable
 components:
   responses:
     Unavailable:
@@ -83,71 +299,245 @@ components:
       additionalProperties: false
       description: Fields are optional so the evaluator can report missing information.
       properties:
-        repository: { type: string, example: acme/storefront }
-        pullRequest: { type: integer, minimum: 1 }
-        headSha: { type: string, pattern: '^[a-f0-9]{40}$' }
+        repository:
+          type: string
+          example: acme/storefront
+        pullRequest:
+          type: integer
+          minimum: 1
+        headSha:
+          type: string
+          pattern: ^[a-f0-9]{40}$
         changeKind:
-          {
-            type: string,
-            enum: [frontend, backend, fullstack, docs, migration],
-          }
-        environment: { type: string, enum: [staging] }
-        flowIds: { type: array, items: { type: string }, minItems: 1 }
-        runbookRef: { type: string }
-        testTenant: { type: string }
+          type: string
+          enum:
+            - frontend
+            - backend
+            - fullstack
+            - docs
+            - migration
+        environment:
+          type: string
+          enum:
+            - staging
+        flowIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        runbookRef:
+          type: string
+        testTenant:
+          type: string
     Evaluation:
       type: object
-      required: [state, missing, reason]
+      required:
+        - state
+        - missing
+        - reason
       properties:
-        state: { type: string, enum: [ready, needs_info, not_testable] }
-        missing: { type: array, items: { type: string } }
-        reason: { type: string }
+        state:
+          type: string
+          enum:
+            - ready
+            - needs_info
+            - not_testable
+        missing:
+          type: array
+          items:
+            type: string
+        reason:
+          type: string
     RunList:
       type: object
-      required: [mode, runs]
+      required:
+        - mode
+        - runs
       properties:
-        mode: { type: string, enum: [demo, postgres] }
-        runs: { type: array, items: { $ref: '#/components/schemas/Run' } }
+        mode:
+          type: string
+          enum:
+            - demo
+            - postgres
+        runs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Run'
     Run:
       type: object
       required:
-        [
-          id,
-          repository,
-          pullRequest,
-          title,
-          headSha,
-          status,
-          sample,
-          environment,
-          createdAt,
-          durationSeconds,
-          flows,
-          assertions,
-          notCovered,
-        ]
+        - id
+        - repository
+        - pullRequest
+        - title
+        - headSha
+        - status
+        - sample
+        - environment
+        - createdAt
+        - durationSeconds
+        - flows
+        - assertions
+        - notCovered
       properties:
-        id: { type: string }
-        repository: { type: string }
-        pullRequest: { type: integer }
-        title: { type: string }
-        headSha: { type: string }
+        id:
+          type: string
+        repository:
+          type: string
+        pullRequest:
+          type: integer
+        title:
+          type: string
+        headSha:
+          type: string
         status:
-          {
-            type: string,
-            enum: [queued, running, verified, partial, failed, couldnt_run],
-          }
-        sample: { type: boolean }
-        environment: { type: string }
-        createdAt: { type: string, format: date-time }
-        durationSeconds: { type: integer }
-        flows: { type: array, items: { type: string } }
+          type: string
+          enum:
+            - queued
+            - running
+            - verified
+            - partial
+            - failed
+            - couldnt_run
+        sample:
+          type: boolean
+        environment:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        durationSeconds:
+          type: integer
+        flows:
+          type: array
+          items:
+            type: string
         assertions:
           type: array
           items:
             type: object
-            required: [label, passed]
+            required:
+              - label
+              - passed
             properties:
-              label: { type: string }
-              passed: { type: boolean }
-        notCovered: { type: array, items: { type: string } }
+              label:
+                type: string
+              passed:
+                type: boolean
+        notCovered:
+          type: array
+          items:
+            type: string
+    EmptyObject:
+      type: object
+      additionalProperties: false
+    LoginInput:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          maxLength: 254
+        password:
+          type: string
+          maxLength: 256
+          writeOnly: true
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - name
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+    Workspace:
+      type: object
+      required:
+        - id
+        - name
+        - role
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum:
+            - owner
+            - editor
+            - viewer
+    Session:
+      type: object
+      required:
+        - user
+        - workspace
+        - mode
+        - csrfToken
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        workspace:
+          $ref: '#/components/schemas/Workspace'
+        mode:
+          type: string
+          enum:
+            - demo
+            - postgres
+        csrfToken:
+          type: string
+    WorkspaceNameInput:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+    Setup:
+      type: object
+      additionalProperties: false
+      required:
+        - repository
+        - stagingUrl
+        - testTenant
+        - runbookRef
+      properties:
+        repository:
+          type: string
+          description: owner/repository, or empty for incomplete setup
+        stagingUrl:
+          type: string
+          description: HTTPS URL without credentials, query or fragment; loopback HTTP allowed; may be empty
+        testTenant:
+          type: string
+          maxLength: 100
+        runbookRef:
+          type: string
+          maxLength: 512
+          description: path@full-lowercase-40-character-commit-SHA, or empty
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: exhibit_session
+  parameters:
+    CSRFToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      description: Session CSRF token; mutations also require same-origin Origin header.
+      schema:
+        type: string
+security:
+  - sessionCookie: []

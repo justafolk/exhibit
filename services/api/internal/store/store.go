@@ -72,7 +72,7 @@ func (p Postgres) Ping(ctx context.Context) error {
 		return err
 	}
 	// Ready means migrations exist too, not merely an open TCP socket.
-	_, err := p.Pool.Exec(ctx, "SELECT id FROM evidence_runs LIMIT 0")
+	_, err := p.Pool.Exec(ctx, "SELECT r.workspace_id, s.token_hash FROM evidence_runs r CROSS JOIN sessions s LIMIT 0")
 	return err
 }
 
@@ -87,7 +87,10 @@ func scan(row pgx.Row) (Run, error) {
 	return r, err
 }
 func (p Postgres) List(ctx context.Context) ([]Run, error) {
-	rows, err := p.Pool.Query(ctx, "SELECT "+columns+" FROM evidence_runs ORDER BY created_at DESC, id DESC LIMIT 100")
+	if WorkspaceID(ctx) == "" {
+		return nil, ErrForbidden
+	}
+	rows, err := p.Pool.Query(ctx, "SELECT "+columns+" FROM evidence_runs WHERE workspace_id=$1 ORDER BY created_at DESC, id DESC LIMIT 100", WorkspaceID(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -103,13 +106,16 @@ func (p Postgres) List(ctx context.Context) ([]Run, error) {
 	return runs, rows.Err()
 }
 func (p Postgres) Get(ctx context.Context, id string) (Run, error) {
-	return scan(p.Pool.QueryRow(ctx, "SELECT "+columns+" FROM evidence_runs WHERE id=$1", id))
+	if WorkspaceID(ctx) == "" {
+		return Run{}, ErrForbidden
+	}
+	return scan(p.Pool.QueryRow(ctx, "SELECT "+columns+" FROM evidence_runs WHERE id=$1 AND workspace_id=$2", id, WorkspaceID(ctx)))
 }
 
 // SeedSamples only inserts explicit demo records. Callers enforce a local DB guard.
 func SeedSamples(ctx context.Context, pool *pgxpool.Pool) error {
 	for _, r := range Samples() {
-		_, err := pool.Exec(ctx, `INSERT INTO evidence_runs (`+columns+`) VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12) ON CONFLICT (id) DO NOTHING`, r.ID, r.Repository, r.PullRequest, r.Title, r.HeadSHA, r.Status, r.Environment, r.CreatedAt, r.DurationSeconds, r.Flows, r.Assertions, r.NotCovered)
+		_, err := pool.Exec(ctx, `INSERT INTO evidence_runs (`+columns+`, workspace_id) VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12,'sample-workspace') ON CONFLICT (id) DO NOTHING`, r.ID, r.Repository, r.PullRequest, r.Title, r.HeadSHA, r.Status, r.Environment, r.CreatedAt, r.DurationSeconds, r.Flows, r.Assertions, r.NotCovered)
 		if err != nil {
 			return err
 		}
