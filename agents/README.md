@@ -8,6 +8,9 @@ Start with the root `AGENTS.md` and `docs/product.md`.
 - `runbooks/`: install/start/environment recipes; secrets by reference only.
 - `policies/`: required trust and execution boundaries for future workers.
 - `templates/`: task and handoff structure for parallel agents.
+- `examples/`: strictly validated sample requests and evidence manifests.
+- `evidence-tooling.md`: local validation, reports, signed-delivery helpers and the
+  optional GitHub Actions sample-recording workflow.
 
 The example flow and runbook are illustrative and not approved for execution. Approval must
 reference the exact content/version in a trusted registry once that feature is implemented.
