@@ -1,15 +1,25 @@
-import type { Session } from '../client';
+import { useState } from 'react';
+import type { Session, WorkspaceClient, Workspace } from '../client';
+import { message } from '../navigation';
 import { Icon, PageHeading } from '../ui';
 
 export function Settings({
   session,
   onLogout,
   pending,
+  client,
+  onWorkspace,
 }: {
   session: Session;
   onLogout: () => void;
   pending: boolean;
+  client: WorkspaceClient;
+  onWorkspace: (workspace: Workspace) => void;
 }) {
+  const [name, setName] = useState(session.workspace.name);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState(false);
   return (
     <>
       <PageHeading
@@ -26,7 +36,63 @@ export function Settings({
         <dl className="settings-list">
           <div>
             <dt>Workspace name</dt>
-            <dd>{session.workspace.name}</dd>
+            <dd>
+              {session.workspace.role === 'owner' ? (
+                <form
+                  className="rename-form"
+                  onSubmit={async (event) => {
+                    event.preventDefault();
+                    setSaving(true);
+                    setError('');
+                    setSaved(false);
+                    try {
+                      const workspace = await client.renameWorkspace(name);
+                      setName(workspace.name);
+                      onWorkspace(workspace);
+                      setSaved(true);
+                    } catch (reason) {
+                      setError(message(reason));
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                >
+                  <div>
+                    <input
+                      aria-label="Workspace name"
+                      value={name}
+                      required
+                      maxLength={100}
+                      disabled={saving}
+                      onChange={(event) => {
+                        setName(event.target.value);
+                        setSaved(false);
+                      }}
+                    />
+                    <button
+                      className="secondary"
+                      disabled={
+                        saving || name.trim() === session.workspace.name
+                      }
+                    >
+                      {saving ? 'Saving…' : 'Save workspace name'}
+                    </button>
+                  </div>
+                  {error && (
+                    <p role="alert" className="form-error">
+                      {error}
+                    </p>
+                  )}
+                  {saved && (
+                    <p role="status" className="rename-success">
+                      Workspace name saved.
+                    </p>
+                  )}
+                </form>
+              ) : (
+                session.workspace.name
+              )}
+            </dd>
           </div>
           <div>
             <dt>Workspace ID</dt>

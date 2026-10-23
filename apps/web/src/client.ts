@@ -4,7 +4,13 @@ export type Run = components['schemas']['Run'];
 export type RunList = components['schemas']['RunList'];
 export type Session = components['schemas']['Session'];
 export type Setup = components['schemas']['Setup'];
+export type Workspace = components['schemas']['Workspace'];
 export type Role = Session['workspace']['role'];
+export type Flow = components['schemas']['Flow'];
+export type FlowInput = components['schemas']['FlowInput'];
+export type EvidenceContract = components['schemas']['EvidenceContract'];
+export type ContractDraft = components['schemas']['ContractDraft'];
+export type Evaluation = components['schemas']['Evaluation'];
 export const emptySetup: Setup = {
   repository: '',
   stagingUrl: '',
@@ -20,6 +26,13 @@ export interface WorkspaceClient {
   getRun(id: string): Promise<Run>;
   getSetup(): Promise<Setup>;
   saveSetup(setup: Setup): Promise<Setup>;
+  renameWorkspace(name: string): Promise<Workspace>;
+  listFlows(): Promise<{ flows: Flow[] }>;
+  createFlow(input: FlowInput): Promise<Flow>;
+  updateFlow(id: string, input: FlowInput): Promise<Flow>;
+  getDraft(): Promise<ContractDraft>;
+  saveDraft(draft: ContractDraft): Promise<ContractDraft>;
+  evaluateContract(draft: ContractDraft): Promise<Evaluation>;
 }
 
 export class APIError extends Error {
@@ -105,4 +118,14 @@ export const apiClient: WorkspaceClient = {
   getRun: (id) => request<Run>(`/runs/${encodeURIComponent(id)}`),
   getSetup: () => request<Setup>('/setup'),
   saveSetup: (setup) => request<Setup>('/setup', 'PUT', setup),
+  renameWorkspace: (name) =>
+    request<Workspace>('/workspace', 'PATCH', { name }),
+  listFlows: () => request<{ flows: Flow[] }>('/flows'),
+  createFlow: (input) => request<Flow>('/flows', 'POST', input),
+  updateFlow: (id, input) =>
+    request<Flow>(`/flows/${encodeURIComponent(id)}`, 'PATCH', input),
+  getDraft: () => request<ContractDraft>('/contract-draft'),
+  saveDraft: (draft) => request<ContractDraft>('/contract-draft', 'PUT', draft),
+  evaluateContract: (draft) =>
+    request<Evaluation>('/contracts/evaluate', 'POST', draft),
 };
