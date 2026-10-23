@@ -56,9 +56,28 @@ func (s Server) registerRecordings(mux *http.ServeMux) {
 		if !editor(w, r) || !available(w) {
 			return
 		}
-		var input evidence.RecordingInput
-		if !decode(w, r, &input) {
+		// A pointer distinguishes an explicit timestamp of zero from a missing
+		// or null value. Keep this wire-format check in the HTTP boundary.
+		var request struct {
+			evidence.RecordingInput
+			Chapters []struct {
+				Label     string   `json:"label"`
+				AtSeconds *float64 `json:"atSeconds"`
+			} `json:"chapters"`
+		}
+		if !decode(w, r, &request) {
 			return
+		}
+		input := request.RecordingInput
+		if request.Chapters != nil {
+			input.Chapters = make([]evidence.Chapter, 0, len(request.Chapters))
+		}
+		for _, chapter := range request.Chapters {
+			if chapter.AtSeconds == nil {
+				failure(w, 400, "each chapter requires an explicit numeric atSeconds timestamp")
+				return
+			}
+			input.Chapters = append(input.Chapters, evidence.Chapter{Label: chapter.Label, AtSeconds: *chapter.AtSeconds})
 		}
 		if err := evidence.ValidateRecording(input); err != nil {
 			failure(w, 400, err.Error())

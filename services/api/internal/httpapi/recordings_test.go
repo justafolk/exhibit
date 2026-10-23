@@ -67,6 +67,10 @@ func TestRecordingRejectsForgedAndInvalidMetadata(t *testing.T) {
 	h := Server{Store: store.Demo{}}.Handler()
 	cookie, session := demoLogin(t, h)
 	for _, body := range []string{
+		strings.Replace(recordingJSON, `,"atSeconds":10`, "", 1),
+		strings.Replace(recordingJSON, `"atSeconds":10`, `"atSeconds":null`, 1),
+		strings.Replace(recordingJSON, `"atSeconds":10`, `"atSeconds":"0"`, 1),
+		strings.Replace(recordingJSON, `"atSeconds":10`, `"atSeconds":0,"unknown":true`, 1),
 		`null`, strings.Replace(recordingJSON, `"name":`, `"origin":"trusted_runner","name":`, 1), strings.Replace(recordingJSON, `"name":`, `"verification":"verified","name":`, 1), strings.Replace(recordingJSON, `"name":`, `"mediaStored":true,"name":`, 1),
 		strings.Replace(recordingJSON, `"zoom":1.25`, `"zoom":0`, 1), strings.Replace(recordingJSON, `"atSeconds":10`, `"atSeconds":13`, 1), strings.Replace(recordingJSON, `"bytes":1024`, `"bytes":134217729`, 1), strings.Replace(recordingJSON, `"fileName":"checkout.webm"`, `"fileName":"../checkout.webm"`, 1), strings.Replace(recordingJSON, `"sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"`, `"sha256":"bad"`, 1),
 	} {
@@ -83,5 +87,22 @@ func TestRecordingRejectsForgedAndInvalidMetadata(t *testing.T) {
 	}
 	if rec := call(h, "GET", "/api/v1/activity", "", cookie, ""); !strings.Contains(rec.Body.String(), `"events":[]`) {
 		t.Fatal("invalid recordings audited as saved")
+	}
+}
+
+func TestRecordingAcceptsExplicitZeroChapterTimestamp(t *testing.T) {
+	h := Server{Store: store.Demo{}}.Handler()
+	cookie, session := demoLogin(t, h)
+	body := strings.Replace(recordingJSON, `"atSeconds":10`, `"atSeconds":0`, 1)
+	rec := call(h, "POST", "/api/v1/recordings", body, cookie, session.CSRFToken)
+	if rec.Code != 201 {
+		t.Fatalf("explicit zero rejected: %d %s", rec.Code, rec.Body)
+	}
+	var recording store.Recording
+	if err := json.Unmarshal(rec.Body.Bytes(), &recording); err != nil {
+		t.Fatal(err)
+	}
+	if len(recording.Chapters) != 1 || recording.Chapters[0].AtSeconds != 0 {
+		t.Fatal("explicit zero not preserved")
 	}
 }
