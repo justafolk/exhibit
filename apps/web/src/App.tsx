@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   emptySetup,
-  previewClient,
+  apiClient,
   type Run,
   type RunList,
   type Session,
@@ -1004,7 +1004,7 @@ function Settings({
   );
 }
 
-export function App({ client = previewClient }: { client?: WorkspaceClient }) {
+export function App({ client = apiClient }: { client?: WorkspaceClient }) {
   const [session, setSession] = useState<Session | null>();
   const [authError, setAuthError] = useState('');
   const [route, setRoute] = useState(readRoute);
@@ -1017,6 +1017,17 @@ export function App({ client = previewClient }: { client?: WorkspaceClient }) {
   const [logoutPending, setLogoutPending] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const [globalSearch, setGlobalSearch] = useState('');
+  useEffect(() => {
+    const expired = () => {
+      setSession(null);
+      setData(undefined);
+      setSetup(emptySetup);
+      setAuthError('Your session has expired. Sign in again to continue.');
+      go('sign-in');
+    };
+    window.addEventListener('exhibit:session-expired', expired);
+    return () => window.removeEventListener('exhibit:session-expired', expired);
+  }, []);
   useEffect(() => {
     let active = true;
     client

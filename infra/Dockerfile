@@ -15,7 +15,9 @@ RUN go mod download
 COPY services services
 COPY db db
 ARG COMMIT_SHA=unknown
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.commitSHA=${COMMIT_SHA}" -o /out/exhibit ./services/api/cmd/server &&     CGO_ENABLED=0 go build -trimpath -o /out/migrate ./services/api/cmd/migrate
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.commitSHA=${COMMIT_SHA}" -o /out/exhibit ./services/api/cmd/server && \
+    CGO_ENABLED=0 go build -trimpath -o /out/migrate ./services/api/cmd/migrate && \
+    CGO_ENABLED=0 go build -trimpath -o /out/bootstrap-user ./services/api/cmd/bootstrap-user
 
 FROM alpine:3.22
 RUN apk add --no-cache ca-certificates && addgroup -S exhibit && adduser -S -G exhibit exhibit

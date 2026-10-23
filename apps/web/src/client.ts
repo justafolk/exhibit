@@ -1,21 +1,10 @@
 import type { components } from '../../../packages/contracts/src/api';
-import sampleRuns from './sample-runs.json';
 
 export type Run = components['schemas']['Run'];
 export type RunList = components['schemas']['RunList'];
-export type Role = 'owner' | 'editor' | 'viewer';
-export type Session = {
-  user: { id: string; email: string; name: string };
-  workspace: { id: string; name: string; role: Role };
-  mode: 'demo' | 'postgres';
-  csrfToken: string;
-};
-export type Setup = {
-  repository: string;
-  stagingUrl: string;
-  testTenant: string;
-  runbookRef: string;
-};
+export type Session = components['schemas']['Session'];
+export type Setup = components['schemas']['Setup'];
+export type Role = Session['workspace']['role'];
 export const emptySetup: Setup = {
   repository: '',
   stagingUrl: '',
@@ -33,55 +22,69 @@ export interface WorkspaceClient {
   saveSetup(setup: Setup): Promise<Setup>;
 }
 
-const previewSession: Session = {
-  user: {
-    id: 'preview-user',
-    email: 'preview@example.invalid',
-    name: 'Sample reviewer',
-  },
-  workspace: { id: 'preview-workspace', name: 'Exhibit sample', role: 'owner' },
-  mode: 'demo',
-  csrfToken: '',
-};
-const sessionKey = 'exhibit.preview.session';
-const setupKey = 'exhibit.preview.setup';
-// This adapter is intentionally separate from the interface. It has no authority
-// outside the clearly labelled browser preview and is replaced at integration.
-export const previewClient: WorkspaceClient = {
+export class APIError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+    this.name = 'APIError';
+  }
+}
+let csrfToken = '';
+async function request<T>(path: string, method = 'GET', body?: unknown, allowAnonymous = false): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (method !== 'GET') {
+    headers['Content-Type'] = 'application/json';
+    if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+  }
+  const response = await fetch(`/api/v1${path}`, {
+    method,
+    headers,
+    credentials: 'same-origin',
+    cache: 'no-store',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = typeof payload?.error === 'string'
+      ? payload.error
+      : `The service returned ${response.status}. Please try again.`;
+    if (response.status === 401 && !allowAnonymous) {
+      csrfToken = '';
+      window.dispatchEvent(new Event('exhibit:session-expired'));
+    }
+    throw new APIError(response.status, message);
+  }
+  return payload as T;
+}
+function remember(session: Session) {
+  csrfToken = session.csrfToken;
+  return session;
+}
+
+// All workspace data comes from the API. Unavailable services never fall back to fixtures.
+export const apiClient: WorkspaceClient = {
   async session() {
-    return sessionStorage.getItem(sessionKey) === 'active'
-      ? previewSession
-      : null;
+    try {
+      return remember(await request<Session>('/auth/session', 'GET', undefined, true));
+    } catch (error) {
+      if (error instanceof APIError && error.status === 401) {
+        csrfToken = '';
+        return null;
+      }
+      throw error;
+    }
   },
-  async login() {
-    throw new Error(
-      'Account sign-in is not connected in this interface preview. Explore the sample workspace instead.',
-    );
+  async login(email, password) {
+    return remember(await request<Session>('/auth/login', 'POST', { email, password }, true));
   },
   async demo() {
-    sessionStorage.setItem(sessionKey, 'active');
-    return previewSession;
+    return remember(await request<Session>('/auth/demo', 'POST', {}, true));
   },
   async logout() {
-    sessionStorage.removeItem(sessionKey);
-    sessionStorage.removeItem(setupKey);
+    await request('/auth/logout', 'POST', {});
+    csrfToken = '';
   },
-  async listRuns() {
-    return { mode: 'demo', runs: sampleRuns as Run[] };
-  },
-  async getRun(id) {
-    const run = (sampleRuns as Run[]).find((item) => item.id === id);
-    if (!run) throw new Error('This evidence run could not be found.');
-    return run;
-  },
-  async getSetup() {
-    const saved = sessionStorage.getItem(setupKey);
-    return saved
-      ? ({ ...emptySetup, ...JSON.parse(saved) } as Setup)
-      : { ...emptySetup };
-  },
-  async saveSetup(setup) {
-    sessionStorage.setItem(setupKey, JSON.stringify(setup));
-    return { ...setup };
-  },
+  listRuns: () => request<RunList>('/runs'),
+  getRun: (id) => request<Run>(`/runs/${encodeURIComponent(id)}`),
+  getSetup: () => request<Setup>('/setup'),
+  saveSetup: (setup) => request<Setup>('/setup', 'PUT', setup),
 };

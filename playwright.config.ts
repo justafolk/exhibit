@@ -11,7 +11,8 @@ export default defineConfig({
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: `http://127.0.0.1:${webPort}`,
-    trace: 'retain-on-failure',
+    trace: process.env.EXHIBIT_CAPTURE === '1' ? 'on' : 'retain-on-failure',
+    video: process.env.EXHIBIT_CAPTURE === '1' ? 'on' : 'off',
     screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
