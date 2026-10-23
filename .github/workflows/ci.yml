@@ -1,0 +1,58 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: exhibit
+          POSTGRES_PASSWORD: ci_only
+          POSTGRES_DB: exhibit
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U exhibit -d exhibit"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgres://exhibit:ci_only@127.0.0.1:5432/exhibit?sslmode=disable
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: npm ci
+      - run: make check
+      - run: make test-integration
+      - run: npx playwright install --with-deps chromium
+      - run: make e2e
+      - name: Build deployable image
+        run: docker build -f infra/Dockerfile --build-arg COMMIT_SHA="$GITHUB_SHA" -t exhibit:ci .
+      - name: Smoke test the image
+        run: python3 scripts/smoke-image.py exhibit:ci
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: failure()
+        with:
+          name: browser-failures
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore

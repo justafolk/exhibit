@@ -1,0 +1,11 @@
+{
+  "name": "@exhibit/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "generate": "openapi-typescript openapi.yaml -o src/api.d.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0"
+  }
+}

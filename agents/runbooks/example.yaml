@@ -1,0 +1,22 @@
+version: 1
+id: storefront-local-staging
+status: example-not-approved
+# Illustrative customer recipe, never executed by this scaffold.
+head: resolved-by-trusted-orchestrator
+install: [npm, ci]
+start: [npm, run, dev, --, --host, 127.0.0.1]
+health_path: /healthz
+version_path: /version
+environment:
+  API_URL: secret-ref://customer/staging/api-url
+  TEST_TOKEN: secret-ref://customer/staging/exhibit-test-token
+  TEST_TENANT: secret-ref://customer/staging/exhibit-test-tenant
+policy:
+  production: deny
+  fork_pull_requests: deny
+  shared_database_migrations: deny
+  staging_writes: reviewed-run-scoped-seed-only
+  queue_consumers: disabled
+  network: explicit-allowlist-required
+  max_runtime_seconds: 600
+  max_concurrent_runs: 1

@@ -1,0 +1,10 @@
+node_modules
+dist
+package-lock.json
+packages/contracts/src/api.d.ts
+requirements.md
+.local
+.worktrees
+go.sum
+playwright-report
+test-results

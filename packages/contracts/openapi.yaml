@@ -1,0 +1,153 @@
+openapi: 3.1.0
+info:
+  title: Exhibit API
+  version: 0.1.0
+  description: Private MVP foundation. Contract evaluation checks completeness only; it never authorizes execution.
+paths:
+  /api/healthz:
+    get:
+      operationId: health
+      responses:
+        '200':
+          description: Process is alive
+  /api/readyz:
+    get:
+      operationId: ready
+      responses:
+        '200':
+          description: Store is reachable
+        '503':
+          description: Store is unavailable
+  /api/version:
+    get:
+      operationId: version
+      responses:
+        '200':
+          description: Build provenance
+  /api/v1/runs:
+    get:
+      operationId: listRuns
+      responses:
+        '200':
+          description: Latest 100 runs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunList'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/runs/{id}:
+    get:
+      operationId: getRun
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Run details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+        '404':
+          description: Run does not exist
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/contracts/evaluate:
+    post:
+      operationId: evaluateContract
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvidenceContract'
+      responses:
+        '200':
+          description: Completeness result; not an execution grant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Evaluation'
+        '400':
+          description: Invalid or oversized JSON (64 KiB maximum)
+components:
+  responses:
+    Unavailable:
+      description: Evidence store unavailable
+  schemas:
+    EvidenceContract:
+      type: object
+      additionalProperties: false
+      description: Fields are optional so the evaluator can report missing information.
+      properties:
+        repository: { type: string, example: acme/storefront }
+        pullRequest: { type: integer, minimum: 1 }
+        headSha: { type: string, pattern: '^[a-f0-9]{40}$' }
+        changeKind:
+          {
+            type: string,
+            enum: [frontend, backend, fullstack, docs, migration],
+          }
+        environment: { type: string, enum: [staging] }
+        flowIds: { type: array, items: { type: string }, minItems: 1 }
+        runbookRef: { type: string }
+        testTenant: { type: string }
+    Evaluation:
+      type: object
+      required: [state, missing, reason]
+      properties:
+        state: { type: string, enum: [ready, needs_info, not_testable] }
+        missing: { type: array, items: { type: string } }
+        reason: { type: string }
+    RunList:
+      type: object
+      required: [mode, runs]
+      properties:
+        mode: { type: string, enum: [demo, postgres] }
+        runs: { type: array, items: { $ref: '#/components/schemas/Run' } }
+    Run:
+      type: object
+      required:
+        [
+          id,
+          repository,
+          pullRequest,
+          title,
+          headSha,
+          status,
+          sample,
+          environment,
+          createdAt,
+          durationSeconds,
+          flows,
+          assertions,
+          notCovered,
+        ]
+      properties:
+        id: { type: string }
+        repository: { type: string }
+        pullRequest: { type: integer }
+        title: { type: string }
+        headSha: { type: string }
+        status:
+          {
+            type: string,
+            enum: [queued, running, verified, partial, failed, couldnt_run],
+          }
+        sample: { type: boolean }
+        environment: { type: string }
+        createdAt: { type: string, format: date-time }
+        durationSeconds: { type: integer }
+        flows: { type: array, items: { type: string } }
+        assertions:
+          type: array
+          items:
+            type: object
+            required: [label, passed]
+            properties:
+              label: { type: string }
+              passed: { type: boolean }
+        notCovered: { type: array, items: { type: string } }

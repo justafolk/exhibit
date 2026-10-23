@@ -1,0 +1,18 @@
+version: 1
+id: checkout.saved-address
+status: example-not-approved
+name: Checkout with a saved address
+paths: ['src/checkout/**', 'src/addresses/**']
+entrypoint: /checkout
+services: [storefront, orders]
+preconditions:
+  - dedicated test tenant
+  - test account with a saved address
+  - cart tagged with the unique run ID
+assertions:
+  - saved address is selected
+  - order total matches the API response
+  - confirmation appears with the created order ID
+cleanup:
+  - remove only records with this run ID in the approved test tenant
+not_covered: [production payments, real email delivery]

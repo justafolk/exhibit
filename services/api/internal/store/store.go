@@ -1,0 +1,118 @@
+package store
+
+import (
+	"context"
+	_ "embed"
+	"encoding/json"
+	"errors"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+var ErrNotFound = errors.New("run not found")
+
+type Assertion struct {
+	Label  string `json:"label"`
+	Passed bool   `json:"passed"`
+}
+type Run struct {
+	ID              string      `json:"id"`
+	Repository      string      `json:"repository"`
+	PullRequest     int         `json:"pullRequest"`
+	Title           string      `json:"title"`
+	HeadSHA         string      `json:"headSha"`
+	Status          string      `json:"status"`
+	Sample          bool        `json:"sample"`
+	Environment     string      `json:"environment"`
+	CreatedAt       time.Time   `json:"createdAt"`
+	DurationSeconds int         `json:"durationSeconds"`
+	Flows           []string    `json:"flows"`
+	Assertions      []Assertion `json:"assertions"`
+	NotCovered      []string    `json:"notCovered"`
+}
+type Store interface {
+	List(context.Context) ([]Run, error)
+	Get(context.Context, string) (Run, error)
+	Ping(context.Context) error
+	Mode() string
+}
+
+//go:embed demo.json
+var demoJSON []byte
+
+func Samples() []Run {
+	var runs []Run
+	if err := json.Unmarshal(demoJSON, &runs); err != nil {
+		panic(err)
+	}
+	return runs
+}
+
+type Demo struct{}
+
+func (Demo) Mode() string                        { return "demo" }
+func (Demo) Ping(context.Context) error          { return nil }
+func (Demo) List(context.Context) ([]Run, error) { return Samples(), nil }
+func (Demo) Get(_ context.Context, id string) (Run, error) {
+	for _, r := range Samples() {
+		if r.ID == id {
+			return r, nil
+		}
+	}
+	return Run{}, ErrNotFound
+}
+
+type Postgres struct{ Pool *pgxpool.Pool }
+
+func (Postgres) Mode() string { return "postgres" }
+func (p Postgres) Ping(ctx context.Context) error {
+	if err := p.Pool.Ping(ctx); err != nil {
+		return err
+	}
+	// Ready means migrations exist too, not merely an open TCP socket.
+	_, err := p.Pool.Exec(ctx, "SELECT id FROM evidence_runs LIMIT 0")
+	return err
+}
+
+const columns = `id, repository, pull_request, title, head_sha, status, sample, environment, created_at, duration_seconds, flows, assertions, not_covered`
+
+func scan(row pgx.Row) (Run, error) {
+	var r Run
+	err := row.Scan(&r.ID, &r.Repository, &r.PullRequest, &r.Title, &r.HeadSHA, &r.Status, &r.Sample, &r.Environment, &r.CreatedAt, &r.DurationSeconds, &r.Flows, &r.Assertions, &r.NotCovered)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return r, ErrNotFound
+	}
+	return r, err
+}
+func (p Postgres) List(ctx context.Context) ([]Run, error) {
+	rows, err := p.Pool.Query(ctx, "SELECT "+columns+" FROM evidence_runs ORDER BY created_at DESC, id DESC LIMIT 100")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	runs := []Run{}
+	for rows.Next() {
+		r, err := scan(rows)
+		if err != nil {
+			return nil, err
+		}
+		runs = append(runs, r)
+	}
+	return runs, rows.Err()
+}
+func (p Postgres) Get(ctx context.Context, id string) (Run, error) {
+	return scan(p.Pool.QueryRow(ctx, "SELECT "+columns+" FROM evidence_runs WHERE id=$1", id))
+}
+
+// SeedSamples only inserts explicit demo records. Callers enforce a local DB guard.
+func SeedSamples(ctx context.Context, pool *pgxpool.Pool) error {
+	for _, r := range Samples() {
+		_, err := pool.Exec(ctx, `INSERT INTO evidence_runs (`+columns+`) VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12) ON CONFLICT (id) DO NOTHING`, r.ID, r.Repository, r.PullRequest, r.Title, r.HeadSHA, r.Status, r.Environment, r.CreatedAt, r.DurationSeconds, r.Flows, r.Assertions, r.NotCovered)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
