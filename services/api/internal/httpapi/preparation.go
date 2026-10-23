@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -8,38 +10,35 @@ import (
 	"github.com/justafolk/exhibit/services/api/internal/store"
 )
 
-type flowPatch struct {
-	Name          *string   `json:"name"`
-	Description   *string   `json:"description"`
-	Preconditions *[]string `json:"preconditions"`
-	Assertions    *[]string `json:"assertions"`
-	Cleanup       *string   `json:"cleanup"`
-	RunbookRef    *string   `json:"runbookRef"`
-}
-
-func (p flowPatch) apply(input evidence.FlowInput) evidence.FlowInput {
-	if p.Name != nil {
-		input.Name = *p.Name
+func decodeFlowPatch(w http.ResponseWriter, r *http.Request) (evidence.FlowPatch, bool) {
+	var fields map[string]json.RawMessage
+	if !decode(w, r, &fields) {
+		return evidence.FlowPatch{}, false
 	}
-	if p.Description != nil {
-		input.Description = *p.Description
+	for key, value := range fields {
+		switch key {
+		case "name", "description", "preconditions", "assertions", "cleanup", "runbookRef":
+		default:
+			failure(w, 400, "unknown flow field")
+			return evidence.FlowPatch{}, false
+		}
+		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+			failure(w, 400, "flow fields cannot be null")
+			return evidence.FlowPatch{}, false
+		}
 	}
-	if p.Preconditions != nil {
-		input.Preconditions = *p.Preconditions
+	raw, _ := json.Marshal(fields)
+	var patch evidence.FlowPatch
+	if err := json.Unmarshal(raw, &patch); err != nil {
+		failure(w, 400, "invalid flow patch")
+		return evidence.FlowPatch{}, false
 	}
-	if p.Assertions != nil {
-		input.Assertions = *p.Assertions
-	}
-	if p.Cleanup != nil {
-		input.Cleanup = *p.Cleanup
-	}
-	if p.RunbookRef != nil {
-		input.RunbookRef = *p.RunbookRef
-	}
-	return input
+	return patch, true
 }
 func preparationFailure(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, evidence.ErrInvalidFlow):
+		failure(w, 400, err.Error())
 	case errors.Is(err, store.ErrNotFound):
 		failure(w, 404, "flow not found")
 	case errors.Is(err, store.ErrCapacity):
@@ -104,22 +103,12 @@ func (s Server) registerPreparation(mux *http.ServeMux) {
 		if !editor(w, r) || !available(w) {
 			return
 		}
-		var patch flowPatch
-		if !decode(w, r, &patch) {
+		patch, valid := decodeFlowPatch(w, r)
+		if !valid {
 			return
 		}
 		session := sessionFrom(r)
-		existing, err := data.GetFlow(r.Context(), session.Workspace.ID, r.PathValue("id"))
-		if err != nil {
-			preparationFailure(w, err)
-			return
-		}
-		input := patch.apply(existing.FlowInput)
-		if err = evidence.ValidateFlow(input); err != nil {
-			failure(w, 400, err.Error())
-			return
-		}
-		flow, err := data.UpdateFlow(r.Context(), session.Workspace.ID, session.User.ID, existing.ID, input)
+		flow, err := data.PatchFlow(r.Context(), session.Workspace.ID, session.User.ID, r.PathValue("id"), patch)
 		if err != nil {
 			preparationFailure(w, err)
 			return

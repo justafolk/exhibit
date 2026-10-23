@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/justafolk/exhibit/services/api/internal/auth"
@@ -74,7 +75,7 @@ func (p Postgres) CreateFlow(ctx context.Context, workspace, actor string, input
 	}
 	return flow, tx.Commit(ctx)
 }
-func (p Postgres) UpdateFlow(ctx context.Context, workspace, actor, id string, input evidence.FlowInput) (Flow, error) {
+func (p Postgres) PatchFlow(ctx context.Context, workspace, actor, id string, patch evidence.FlowPatch) (Flow, error) {
 	if workspace == "" {
 		return Flow{}, ErrForbidden
 	}
@@ -83,6 +84,14 @@ func (p Postgres) UpdateFlow(ctx context.Context, workspace, actor, id string, i
 		return Flow{}, err
 	}
 	defer tx.Rollback(ctx)
+	existing, err := scanFlow(tx.QueryRow(ctx, `SELECT `+flowColumns+` FROM flow_definitions WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, workspace, id))
+	if err != nil {
+		return Flow{}, err
+	}
+	input := patch.Apply(existing.FlowInput)
+	if err = evidence.ValidateFlow(input); err != nil {
+		return Flow{}, fmt.Errorf("%w: %s", evidence.ErrInvalidFlow, err)
+	}
 	flow, err := scanFlow(tx.QueryRow(ctx, `UPDATE flow_definitions SET name=$3,description=$4,preconditions=$5,assertions=$6,cleanup=$7,runbook_ref=$8,updated_by=$9,updated_at=now() WHERE workspace_id=$1 AND id=$2 RETURNING `+flowColumns, workspace, id, input.Name, input.Description, input.Preconditions, input.Assertions, input.Cleanup, input.RunbookRef, actor))
 	if err != nil {
 		return Flow{}, err
