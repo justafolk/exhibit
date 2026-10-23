@@ -40,7 +40,7 @@ export default defineConfig({
   webServer: {
     command: 'node scripts/dev.mjs',
     gracefulShutdown: { signal: 'SIGTERM', timeout: 5000 },
-    url: `http://127.0.0.1:${webPort}`,
+    url: `http://127.0.0.1:${webPort}/api/healthz`,
     reuseExistingServer: false,
     timeout: 120_000,
     env: {

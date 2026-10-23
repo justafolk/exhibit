@@ -45,11 +45,28 @@ Owners manage workspace setup; editors prepare flow metadata and evidence contra
 viewers read evidence. The API enforces these roles. A client-side role or hidden button
 cannot grant access. Authentication and run reads are scoped to a workspace.
 
+In **Flow catalog**, save a definition with preconditions, deterministic assertions,
+cleanup instructions and a runbook reference ending in `@` plus the full commit SHA.
+Definitions are authored preparation metadata, not approved execution policy.
+
+In **Prepare evidence**, select a saved flow and supply the PR number, full head SHA,
+repository and staging context. **Save draft** preserves incomplete work;
+**Evaluate contract** explains missing or unsupported values without creating a run.
+Flow and draft changes are persisted with actor and timestamp in PostgreSQL. In sample
+mode, they remain session-local and disappear when you sign out or restart the API.
+
+Owners can rename the workspace in **Settings**. Accounts and memberships remain
+operator-provisioned; there is no public invitation or self-service role selector.
+
 ## Review evidence honestly
 
 Review the complete head SHA, environment, assertion outcomes and uncovered behavior.
 Sample records remain labelled in reports. Contract readiness only means required
 metadata is supplied; it does not mean assertions ran or execution was authorized.
+
+Search and status filters are part of the URL. Searches include the full SHA, PR number,
+repository, title and run ID, and return up to 100 recent matching records within your
+workspace. Copy or download a Markdown report to retain the source SHA and limitations.
 
 Customer execution requires a separately provisioned isolation boundary and trusted
 GitHub identity, runbook approval, credentials and artifact collection. Until those

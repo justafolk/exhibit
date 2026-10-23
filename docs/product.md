@@ -22,7 +22,8 @@ wall-time and sandbox budgets before any paid execution is enabled.
 
 The light-mode workspace provides private account sign-in, server-enforced workspace
 roles, isolated sample exploration, overview and run reports, and persistent repository
-and staging setup. Owners are provisioned through a trusted CLI; public registration,
+and staging setup. Flow definitions and contract drafts make evidence preparation reusable;
+URL-preserved search and qualified Markdown exports support review. Owners are provisioned through a trusted CLI; public registration,
 email recovery and GitHub OAuth are not implemented. Setup records metadata without
 claiming GitHub connectivity, runbook approval or permission to execute.
 

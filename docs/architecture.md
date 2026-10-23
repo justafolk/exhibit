@@ -18,6 +18,8 @@ memberships and configuration; demo sessions use isolated in-memory configuratio
 An operator CLI creates the first owner. There is no public registration or account recovery.
 Mutations require an exact allowed origin and a session-bound CSRF token. Every real
 run query requires workspace scope; legacy records remain in an unclaimed sample workspace.
+Run filters apply before the latest-100 limit. Authored flow definitions and contract
+drafts have tenant ownership, bounded domain validation and actor/time metadata.
 There is no mutation endpoint that schedules customer execution.
 OpenAPI is the shared boundary; TypeScript types are generated and CI detects drift.
 

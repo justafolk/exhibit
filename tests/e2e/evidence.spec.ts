@@ -135,6 +135,37 @@ test('empty workspace has an honest onboarding state', async ({ page }) => {
   await expect(page.getByText('Your evidence starts here')).toBeVisible();
 });
 
+test('invalid report links show a recoverable error', async ({ page }) => {
+  await openSample(page, 'runs/%');
+  await expect(
+    page.getByRole('heading', { name: 'Report unavailable' }),
+  ).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Main navigation' })
+    .getByRole('link', { name: /Evidence runs/ })
+    .click();
+  await expect(page.locator('tbody tr')).toHaveCount(5);
+});
+
+test('owners can rename their workspace', async ({ page }) => {
+  await openSample(page, 'settings');
+  await page
+    .getByLabel('Workspace name', { exact: true })
+    .fill('Review studio');
+  await page
+    .getByRole('button', { name: 'Save workspace name', exact: true })
+    .click();
+  await expect(page.getByRole('status')).toContainText('Workspace name saved.');
+  await page.reload();
+  await expect(page.getByLabel('Workspace name', { exact: true })).toHaveValue(
+    'Review studio',
+  );
+  expect(
+    (await (await page.request.get('/api/v1/auth/session')).json()).workspace
+      .name,
+  ).toBe('Review studio');
+});
+
 test('API errors are actionable and never fall back to fixtures', async ({
   page,
 }) => {
@@ -176,4 +207,101 @@ test('mobile navigation and logout are usable', async ({ page }) => {
   await expect(
     page.getByRole('button', { name: 'Sign in', exact: true }),
   ).toBeVisible();
+});
+
+test('flow definitions and contract drafts persist without authorizing execution', async ({
+  page,
+}) => {
+  await openSample(page, 'flows');
+  await page.getByRole('button', { name: 'Create flow', exact: true }).click();
+  await page
+    .getByLabel('Flow name', { exact: true })
+    .fill('Saved-address review');
+  await page
+    .getByLabel('Description', { exact: true })
+    .fill('Review one saved-address checkout.');
+  await page
+    .getByLabel('Preconditions', { exact: true })
+    .fill('Dedicated test tenant\nSaved address exists');
+  await page
+    .getByLabel('Deterministic assertions', { exact: true })
+    .fill('Saved address is selected\nOrder total matches');
+  await page
+    .getByLabel('Cleanup instructions', { exact: true })
+    .fill('Remove only records tagged with the run ID.');
+  const runbook =
+    'agents/runbooks/checkout.yaml@0123456789abcdef0123456789abcdef01234567';
+  await page
+    .getByLabel('Versioned runbook reference', { exact: true })
+    .fill(runbook);
+  await page.getByRole('button', { name: 'Save flow', exact: true }).click();
+  await expect(
+    page.getByRole('button', {
+      name: 'Edit Saved-address review',
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.reload();
+  await page
+    .getByRole('button', { name: 'Edit Saved-address review', exact: true })
+    .click();
+  await expect(page.getByLabel('Preconditions', { exact: true })).toHaveValue(
+    'Dedicated test tenant\nSaved address exists',
+  );
+  await page.keyboard.press('Escape');
+  await page
+    .getByRole('navigation', { name: 'Main navigation' })
+    .getByRole('link', { name: 'Prepare evidence', exact: true })
+    .click();
+  await page.getByLabel('Repository', { exact: true }).fill('acme/storefront');
+  await page.getByLabel('Pull request number', { exact: true }).fill('286');
+  await page
+    .getByLabel('Head commit SHA', { exact: true })
+    .fill('0123456789abcdef0123456789abcdef01234567');
+  await page
+    .getByLabel('Change type', { exact: true })
+    .selectOption('frontend');
+  await page.getByRole('checkbox', { name: /Saved-address review/ }).check();
+  await page
+    .getByLabel('Versioned runbook reference', { exact: true })
+    .fill(runbook);
+  await page
+    .getByLabel('Test tenant reference', { exact: true })
+    .fill('checkout-review-tenant');
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect
+    .poll(
+      async () =>
+        (await (await page.request.get('/api/v1/contract-draft')).json())
+          .testTenant,
+    )
+    .toBe('checkout-review-tenant');
+  await page.reload();
+  await expect(
+    page.getByLabel('Pull request number', { exact: true }),
+  ).toHaveValue('286');
+  await expect(
+    page.getByRole('checkbox', { name: /Saved-address review/ }),
+  ).toBeChecked();
+  await page
+    .getByRole('button', { name: 'Evaluate contract', exact: true })
+    .click();
+  await expect(page.getByRole('status')).toContainText(
+    'Ready for policy review',
+  );
+  await page.getByLabel('Test tenant reference', { exact: true }).fill('');
+  await page
+    .getByRole('button', { name: 'Evaluate contract', exact: true })
+    .click();
+  await expect(page.getByRole('status')).toContainText('testTenant');
+  await page
+    .getByLabel('Change type', { exact: true })
+    .selectOption('migration');
+  await page
+    .getByRole('button', { name: 'Evaluate contract', exact: true })
+    .click();
+  await expect(page.getByRole('status')).toContainText('Not testable');
+  const runs = await (await page.request.get('/api/v1/runs')).json();
+  expect(runs.runs).toHaveLength(5);
+  expect(runs.runs.every((run: { sample: boolean }) => run.sample)).toBe(true);
 });
