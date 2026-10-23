@@ -120,7 +120,7 @@ func TestRealModeFailsClosed(t *testing.T) {
 func TestSetupAndLoginInput(t *testing.T) {
 	h := Server{Store: store.Demo{}}.Handler()
 	cookie, session := demoLogin(t, h)
-	for _, body := range []string{`null`, `{} {}`, `{"unknown":true}`, `{"repository":"bad"}`, `{"stagingUrl":"https://user:secret@example.com"}`, `{"stagingUrl":"http://public.example"}`, `{"stagingUrl":"https://example.com?token=secret"}`, `{"runbookRef":"mutable/main"}`} {
+	for _, body := range []string{`null`, `{} {}`, `{"unknown":true}`, `{"repository":"bad"}`, `{"stagingUrl":"https://user:secret@example.com"}`, `{"stagingUrl":"http://public.example"}`, `{"stagingUrl":"https://example.com?token=secret"}`, `{"runbookRef":"mutable/main"}`, `{"runbookRef":"path\u0000@0000000000000000000000000000000000000001"}`} {
 		if rec := call(h, "PUT", "/api/v1/setup", body, cookie, session.CSRFToken); rec.Code != 400 {
 			t.Fatalf("accepted %s: %d", body, rec.Code)
 		}

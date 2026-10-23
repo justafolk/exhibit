@@ -331,6 +331,11 @@ var repositoryPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-
 var runbookPattern = regexp.MustCompile(`^[^\s@]+@[0-9a-f]{40}$`)
 
 func validateSetup(s store.Setup) string {
+	for _, value := range []string{s.Repository, s.StagingURL, s.TestTenant, s.RunbookRef} {
+		if strings.ContainsRune(value, 0) {
+			return "setup values must not contain NUL"
+		}
+	}
 	if s.Repository != "" && !repositoryPattern.MatchString(s.Repository) {
 		return "repository must use owner/repository format"
 	}
