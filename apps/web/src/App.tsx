@@ -17,15 +17,18 @@ import { SetupPage } from './pages/SetupPage';
 import { Flows } from './pages/Flows';
 import { Prepare } from './pages/Prepare';
 import { Settings } from './pages/Settings';
+import { Studio } from './pages/Studio';
 import { go, message, readRoute, decodeRoutePart } from './navigation';
 
-type Page = 'overview' | 'runs' | 'setup' | 'flows' | 'settings' | 'prepare';
+type Page =
+  'overview' | 'runs' | 'setup' | 'flows' | 'settings' | 'prepare' | 'studio';
 const navigation: { id: Page; label: string; icon: IconName }[] = [
   { id: 'overview', label: 'Overview', icon: 'overview' },
   { id: 'runs', label: 'Evidence runs', icon: 'runs' },
   { id: 'setup', label: 'Workspace setup', icon: 'setup' },
   { id: 'flows', label: 'Flow catalog', icon: 'flow' },
   { id: 'prepare', label: 'Prepare evidence', icon: 'file' },
+  { id: 'studio', label: 'Recording studio', icon: 'video' },
   { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
@@ -408,6 +411,8 @@ export function App({ client = apiClient }: { client?: WorkspaceClient }) {
             <Flows client={client} session={session} />
           ) : page === 'prepare' ? (
             <Prepare client={client} session={session} setup={setup} />
+          ) : page === 'studio' ? (
+            <Studio client={client} session={session} runs={data} />
           ) : page === 'settings' ? (
             <Settings
               client={client}
