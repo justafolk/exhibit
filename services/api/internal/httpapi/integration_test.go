@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -41,6 +42,7 @@ func TestPostgresLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg.ConnConfig.RuntimeParams["search_path"] = schema
+	cfg.ConnConfig.RuntimeParams["application_name"] = schema
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -215,6 +217,60 @@ func TestPostgresLifecycle(t *testing.T) {
 	var events int
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM configuration_events WHERE workspace_id='alpha' AND actor_id='alpha'`).Scan(&events); err != nil || events != 3 {
 		t.Fatalf("missing authorship events: %d %v", events, err)
+	}
+
+	for _, body := range []string{`{"name":null}`, `{"assertions":null}`, `{"assertions":[]}`} {
+		if rec := call(h, "PATCH", "/api/v1/flows/"+flow.ID, body, alpha, session.CSRFToken); rec.Code != 400 {
+			t.Fatal("invalid patch accepted")
+		}
+	}
+	var eventsAfter int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM configuration_events WHERE workspace_id='alpha'`).Scan(&eventsAfter); err != nil || eventsAfter != events {
+		t.Fatal("invalid patches added audit events")
+	}
+	// Hold the row lock until BOTH requests reach PostgreSQL. With a read-then-write
+	// handler, both requests would have read the old definition before waiting at
+	// UPDATE, and the second update would discard the other's distinct-field edit.
+	lock, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Rollback(ctx)
+	if _, err = lock.Exec(ctx, `SELECT id FROM flow_definitions WHERE id=$1 FOR UPDATE`, flow.ID); err != nil {
+		t.Fatal(err)
+	}
+	results := make(chan *httptest.ResponseRecorder, 2)
+	for _, body := range []string{`{"name":"Concurrent name"}`, `{"cleanup":"Concurrent cleanup"}`} {
+		go func(body string) {
+			results <- call(h, "PATCH", "/api/v1/flows/"+flow.ID, body, alpha, session.CSRFToken)
+		}(body)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		var waiting int
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock'`, schema).Scan(&waiting); err != nil {
+			t.Fatal(err)
+		}
+		if waiting >= 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("concurrent patches did not reach row-lock barrier")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if err = lock.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		rec := <-results
+		if rec.Code != 200 {
+			t.Fatalf("concurrent patch: %d %s", rec.Code, rec.Body)
+		}
+	}
+	latest, err := data.GetFlow(ctx, "alpha", flow.ID)
+	if err != nil || latest.Name != "Concurrent name" || latest.Cleanup != "Concurrent cleanup" {
+		t.Fatal("concurrent patch overwrote an omitted field")
 	}
 	if _, err := pool.Exec(ctx, `UPDATE workspace_memberships SET role='viewer' WHERE user_id='alpha'`); err != nil {
 		t.Fatal(err)

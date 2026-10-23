@@ -90,3 +90,45 @@ func TestPreparationRoles(t *testing.T) {
 		}
 	}
 }
+
+func TestFlowPatchRejectsNullAndPreservesConcurrentEdits(t *testing.T) {
+	h := Server{Store: store.Demo{}}.Handler()
+	cookie, session := demoLogin(t, h)
+	created := call(h, "POST", "/api/v1/flows", flowJSON, cookie, session.CSRFToken)
+	var original store.Flow
+	if err := json.Unmarshal(created.Body.Bytes(), &original); err != nil {
+		t.Fatal(err)
+	}
+	for _, body := range []string{`{"name":null}`, `{"assertions":null}`, `{"description":null}`, `{"unknown":"value"}`, `{"assertions":[]}`} {
+		rec := call(h, "PATCH", "/api/v1/flows/"+original.ID, body, cookie, session.CSRFToken)
+		if rec.Code != 400 {
+			t.Fatalf("accepted %s: %d", body, rec.Code)
+		}
+	}
+	current := call(h, "GET", "/api/v1/flows/"+original.ID, "", cookie, "")
+	var unchanged store.Flow
+	_ = json.Unmarshal(current.Body.Bytes(), &unchanged)
+	if unchanged.Name != original.Name || !unchanged.UpdatedAt.Equal(original.UpdatedAt) {
+		t.Fatal("invalid patch mutated flow")
+	}
+	start := make(chan struct{})
+	results := make(chan int, 2)
+	for _, body := range []string{`{"name":"Concurrent name"}`, `{"cleanup":"Concurrent cleanup"}`} {
+		go func(body string) {
+			<-start
+			results <- call(h, "PATCH", "/api/v1/flows/"+original.ID, body, cookie, session.CSRFToken).Code
+		}(body)
+	}
+	close(start)
+	for range 2 {
+		if code := <-results; code != 200 {
+			t.Fatalf("concurrent patch %d", code)
+		}
+	}
+	current = call(h, "GET", "/api/v1/flows/"+original.ID, "", cookie, "")
+	var updated store.Flow
+	_ = json.Unmarshal(current.Body.Bytes(), &updated)
+	if updated.Name != "Concurrent name" || updated.Cleanup != "Concurrent cleanup" {
+		t.Fatal("concurrent patch lost an omitted field")
+	}
+}

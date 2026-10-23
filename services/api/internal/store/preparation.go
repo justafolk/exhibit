@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -20,7 +21,7 @@ type PreparationStore interface {
 	ListFlows(context.Context, string) ([]Flow, error)
 	GetFlow(context.Context, string, string) (Flow, error)
 	CreateFlow(context.Context, string, string, evidence.FlowInput) (Flow, error)
-	UpdateFlow(context.Context, string, string, string, evidence.FlowInput) (Flow, error)
+	PatchFlow(context.Context, string, string, string, evidence.FlowPatch) (Flow, error)
 	Draft(context.Context, string) (evidence.Contract, error)
 	SaveDraft(context.Context, string, string, evidence.Contract) error
 }
@@ -67,11 +68,16 @@ func (m *MemoryIdentity) CreateFlow(_ context.Context, workspace, actor string, 
 	m.flows[workspace][flow.ID] = cloneFlow(flow)
 	return flow, nil
 }
-func (m *MemoryIdentity) UpdateFlow(_ context.Context, workspace, actor, id string, input evidence.FlowInput) (Flow, error) {
+func (m *MemoryIdentity) PatchFlow(_ context.Context, workspace, actor, id string, patch evidence.FlowPatch) (Flow, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := m.flows[workspace][id]; !ok {
+	existing, ok := m.flows[workspace][id]
+	if !ok {
 		return Flow{}, ErrNotFound
+	}
+	input := patch.Apply(existing.FlowInput)
+	if err := evidence.ValidateFlow(input); err != nil {
+		return Flow{}, fmt.Errorf("%w: %s", evidence.ErrInvalidFlow, err)
 	}
 	flow := Flow{ID: id, FlowInput: input, UpdatedAt: time.Now().UTC(), UpdatedBy: actor}
 	m.flows[workspace][id] = cloneFlow(flow)

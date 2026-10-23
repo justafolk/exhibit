@@ -1,6 +1,7 @@
 package evidence
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -79,4 +80,38 @@ func ValidateDraft(input Contract) error {
 		}
 	}
 	return nil
+}
+
+var ErrInvalidFlow = errors.New("invalid flow")
+
+// FlowPatch is applied to the latest stored definition while holding its write lock.
+type FlowPatch struct {
+	Name          *string   `json:"name"`
+	Description   *string   `json:"description"`
+	Preconditions *[]string `json:"preconditions"`
+	Assertions    *[]string `json:"assertions"`
+	Cleanup       *string   `json:"cleanup"`
+	RunbookRef    *string   `json:"runbookRef"`
+}
+
+func (p FlowPatch) Apply(input FlowInput) FlowInput {
+	if p.Name != nil {
+		input.Name = *p.Name
+	}
+	if p.Description != nil {
+		input.Description = *p.Description
+	}
+	if p.Preconditions != nil {
+		input.Preconditions = *p.Preconditions
+	}
+	if p.Assertions != nil {
+		input.Assertions = *p.Assertions
+	}
+	if p.Cleanup != nil {
+		input.Cleanup = *p.Cleanup
+	}
+	if p.RunbookRef != nil {
+		input.RunbookRef = *p.RunbookRef
+	}
+	return input
 }
