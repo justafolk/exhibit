@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "sample": true,
+  "repository": "acme/storefront",
+  "pullRequest": 42,
+  "headSha": "0123456789abcdef0123456789abcdef01234567",
+  "flowId": "checkout.saved-address",
+  "flowRevision": "0123456789abcdef0123456789abcdef01234567",
+  "runbookRef": "agents/runbooks/example.yaml@0123456789abcdef0123456789abcdef01234567",
+  "testTenant": "sample-tenant-not-approved",
+  "environment": "staging",
+  "budgets": {
+    "maxRuntimeSeconds": 600,
+    "maxArtifactBytes": 104857600
+  }
+}

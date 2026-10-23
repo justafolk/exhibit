@@ -1,0 +1,1 @@
+Illustrative artifact fixture only. No browser or staging flow was executed.

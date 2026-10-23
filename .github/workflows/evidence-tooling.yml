@@ -1,0 +1,110 @@
+name: Evidence tooling
+on:
+  pull_request:
+    types: [ready_for_review]
+  workflow_dispatch:
+    inputs:
+      capture_self_test:
+        description: Record Exhibit's own sample browser tests (no customer staging)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: evidence-tooling-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    if: >-
+      (github.event_name == 'workflow_dispatch' &&
+       github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Validate trusted base tooling, never execute the incoming PR tree.
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Validate evidence tooling and examples
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_evidence_*.py'
+          go test -race ./services/api/internal/githubingress
+          python3 scripts/evidence_tool.py request agents/examples/request.json
+          python3 scripts/evidence_tool.py manifest agents/examples/manifest.json
+      - name: Explain validation boundary
+        if: always()
+        run: |
+          printf '%s\n' '## Evidence tooling validation' '' 'This workflow validates trusted base-branch tooling and illustrative metadata only.' 'It does not execute customer PR code, access staging, approve a runbook, or produce a verified verdict.' >> "$GITHUB_STEP_SUMMARY"
+  record-self-test:
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.capture_self_test &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EXHIBIT_CAPTURE: '1'
+      PLAYWRIGHT_JSON_OUTPUT_FILE: .local/self-test/playwright.json
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Prepare capture directories
+        run: mkdir -p .local/self-test test-results
+      - name: Record sample browser suite
+        id: browser
+        continue-on-error: true
+        run: npm run test:e2e -- --reporter=json
+      - name: Collect self-test manifest and report
+        id: collect
+        if: always() && steps.browser.outcome != 'skipped'
+        env:
+          CAPTURE_SHA: ${{ github.sha }}
+          CAPTURE_REPOSITORY: ${{ github.repository }}
+          CAPTURE_ID: self-test-${{ github.run_id }}
+          CAPTURE_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          python3 scripts/evidence_capture.py --playwright-json .local/self-test/playwright.json --artifact-root test-results --output .local/self-test/manifest.json --repository "$CAPTURE_REPOSITORY" --sha "$CAPTURE_SHA" --run-id "$CAPTURE_ID" --attempt "$CAPTURE_ATTEMPT" > .local/self-test/report.md
+          cat .local/self-test/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: exhibit-self-test-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .local/self-test/manifest.json
+            .local/self-test/report.md
+            test-results/
+          # Only the explicitly listed sample outputs may include hidden paths.
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Report final capture stages
+        if: always()
+        env:
+          BROWSER_OUTCOME: ${{ steps.browser.outcome }}
+          COLLECTION_OUTCOME: ${{ steps.collect.outcome }}
+        run: |
+          printf '\n%s\n' '## Self-test capture status' >> "$GITHUB_STEP_SUMMARY"
+          printf 'Browser suite: %s\n\nManifest collection: %s\n\n' "$BROWSER_OUTCOME" "$COLLECTION_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' 'Only successful collection produces a manifest. This sample workflow never certifies customer evidence.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve browser failure as job failure
+        if: always() && steps.browser.outcome != 'success'
+        run: exit 1
