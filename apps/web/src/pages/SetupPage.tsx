@@ -112,6 +112,23 @@ export function SetupPage({
                 </div>
               ))}
             </fieldset>
+            {dirty && (
+              <details className="setup-review">
+                <summary>Review configuration changes</summary>
+                <dl>
+                  {fields.map((field) => (
+                    <div key={field.key}>
+                      <dt>{field.title}</dt>
+                      <dd>{draft[field.key] || 'Not supplied'}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p>
+                  Saving these references does not connect integrations or grant
+                  execution approval.
+                </p>
+              </details>
+            )}
             {error && (
               <p role="alert" className="form-error">
                 {error}

@@ -15,15 +15,17 @@ import { Runs } from './pages/Runs';
 import { RunDetail } from './pages/RunDetail';
 import { SetupPage } from './pages/SetupPage';
 import { Flows } from './pages/Flows';
+import { Prepare } from './pages/Prepare';
 import { Settings } from './pages/Settings';
 import { go, message, readRoute, decodeRoutePart } from './navigation';
 
-type Page = 'overview' | 'runs' | 'setup' | 'flows' | 'settings';
+type Page = 'overview' | 'runs' | 'setup' | 'flows' | 'settings' | 'prepare';
 const navigation: { id: Page; label: string; icon: IconName }[] = [
   { id: 'overview', label: 'Overview', icon: 'overview' },
   { id: 'runs', label: 'Evidence runs', icon: 'runs' },
   { id: 'setup', label: 'Workspace setup', icon: 'setup' },
   { id: 'flows', label: 'Flow catalog', icon: 'flow' },
+  { id: 'prepare', label: 'Prepare evidence', icon: 'file' },
   { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
@@ -403,9 +405,13 @@ export function App({ client = apiClient }: { client?: WorkspaceClient }) {
               onSave={setSetup}
             />
           ) : page === 'flows' ? (
-            <Flows />
+            <Flows client={client} session={session} />
+          ) : page === 'prepare' ? (
+            <Prepare client={client} session={session} setup={setup} />
           ) : page === 'settings' ? (
             <Settings
+              client={client}
+              onWorkspace={(workspace) => setSession({ ...session, workspace })}
               session={session}
               onLogout={logout}
               pending={logoutPending}
