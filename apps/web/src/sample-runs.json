@@ -1,0 +1,124 @@
+[
+  {
+    "id": "exh-1042",
+    "repository": "acme/storefront",
+    "pullRequest": 286,
+    "title": "Add express checkout with saved addresses",
+    "headSha": "0000000000000000000000000000000000000412",
+    "status": "verified",
+    "sample": true,
+    "environment": "staging",
+    "createdAt": "2026-10-23T14:24:00Z",
+    "durationSeconds": 134,
+    "flows": ["Express checkout", "Saved addresses"],
+    "assertions": [
+      {
+        "label": "Checkout starts with the saved address",
+        "passed": true
+      },
+      {
+        "label": "Order confirmation matches API response",
+        "passed": true
+      },
+      {
+        "label": "Run-scoped cart is removed after execution",
+        "passed": true
+      }
+    ],
+    "notCovered": ["Production payment processing", "Mobile Safari"]
+  },
+  {
+    "id": "exh-1041",
+    "repository": "acme/storefront",
+    "pullRequest": 285,
+    "title": "Handle expired invitation links",
+    "headSha": "0000000000000000000000000000000000000411",
+    "status": "partial",
+    "sample": true,
+    "environment": "staging",
+    "createdAt": "2026-10-23T13:24:00Z",
+    "durationSeconds": 96,
+    "flows": ["Team invitations"],
+    "assertions": [
+      {
+        "label": "Expired link shows a recovery action",
+        "passed": true
+      },
+      {
+        "label": "New invitation email is delivered",
+        "passed": false
+      }
+    ],
+    "notCovered": ["Email delivery: sandbox mailbox unavailable"]
+  },
+  {
+    "id": "exh-1040",
+    "repository": "acme/storefront",
+    "pullRequest": 284,
+    "title": "Fix discount stacking at checkout",
+    "headSha": "0000000000000000000000000000000000000410",
+    "status": "failed",
+    "sample": true,
+    "environment": "staging",
+    "createdAt": "2026-10-23T12:24:00Z",
+    "durationSeconds": 81,
+    "flows": ["Discount calculation"],
+    "assertions": [
+      {
+        "label": "Single discount is applied",
+        "passed": true
+      },
+      {
+        "label": "Stacked discounts respect the maximum",
+        "passed": false
+      }
+    ],
+    "notCovered": ["Refunds and cancellation"]
+  },
+  {
+    "id": "exh-1039",
+    "repository": "acme/storefront",
+    "pullRequest": 283,
+    "title": "Improve empty states in project overview",
+    "headSha": "000000000000000000000000000000000000040f",
+    "status": "verified",
+    "sample": true,
+    "environment": "staging",
+    "createdAt": "2026-10-23T11:24:00Z",
+    "durationSeconds": 72,
+    "flows": ["Project overview"],
+    "assertions": [
+      {
+        "label": "Empty workspace shows onboarding",
+        "passed": true
+      },
+      {
+        "label": "Create project action is keyboard accessible",
+        "passed": true
+      }
+    ],
+    "notCovered": ["Localization"]
+  },
+  {
+    "id": "exh-1038",
+    "repository": "acme/platform",
+    "pullRequest": 282,
+    "title": "Return pagination metadata for audit events",
+    "headSha": "000000000000000000000000000000000000040e",
+    "status": "couldnt_run",
+    "sample": true,
+    "environment": "staging",
+    "createdAt": "2026-10-23T10:24:00Z",
+    "durationSeconds": 28,
+    "flows": ["Audit events API"],
+    "assertions": [
+      {
+        "label": "Local service passes readiness check",
+        "passed": false
+      }
+    ],
+    "notCovered": [
+      "Service could not connect to staging; no assertions executed"
+    ]
+  }
+]

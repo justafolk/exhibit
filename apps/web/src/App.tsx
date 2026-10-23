@@ -1,736 +1,1332 @@
-import { useEffect, useRef, useState } from 'react';
-import type { components } from '../../../packages/contracts/src/api';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import {
+  emptySetup,
+  previewClient,
+  type Run,
+  type RunList,
+  type Session,
+  type Setup,
+  type WorkspaceClient,
+} from './client';
+import {
+  Badge,
+  duration,
+  Empty,
+  Icon,
+  Notice,
+  PageHeading,
+  statusLabels,
+  type IconName,
+} from './ui';
 
-type Run = components['schemas']['Run'];
-type RunList = components['schemas']['RunList'];
-type Evaluation = components['schemas']['Evaluation'];
-type IconName =
-  | 'grid'
-  | 'flow'
-  | 'book'
-  | 'arrow'
-  | 'check'
-  | 'search'
-  | 'branch'
-  | 'clock'
-  | 'close'
-  | 'plus'
-  | 'code';
-const paths: Record<IconName, string> = {
-  grid: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
-  flow: 'M12 3v5 M5 16v-4h14v4 M8 3h8v4H8z M2 16h6v5H2z M16 16h6v5h-6z',
-  book: 'M4 3h14a2 2 0 0 1 2 2v16H6a2 2 0 0 1-2-2V3z M4 17h16 M8 7h8 M8 11h6',
-  arrow: 'M5 12h14 M13 6l6 6-6 6',
-  check: 'M5 12l4 4L19 6',
-  search: 'M21 21l-5-5 M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0',
-  branch: 'M6 3v12a4 4 0 0 0 8 0V9 M3 3a3 3 0 1 0 6 0 M11 6a3 3 0 1 0 6 0',
-  clock: 'M12 7v5l3 2 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
-  close: 'M6 6l12 12 M6 18L18 6',
-  plus: 'M12 5v14 M5 12h14',
-  code: 'M8 6l-6 6 6 6 M16 6l6 6-6 6 M14 3l-4 18',
+type Page = 'overview' | 'runs' | 'setup' | 'flows' | 'settings';
+const navigation: { id: Page; label: string; icon: IconName }[] = [
+  { id: 'overview', label: 'Overview', icon: 'overview' },
+  { id: 'runs', label: 'Evidence runs', icon: 'runs' },
+  { id: 'setup', label: 'Workspace setup', icon: 'setup' },
+  { id: 'flows', label: 'Flow catalog', icon: 'flow' },
+  { id: 'settings', label: 'Settings', icon: 'settings' },
+];
+const readRoute = () => window.location.hash.replace(/^#\/?/, '') || 'overview';
+const go = (route: string) => {
+  window.location.hash = `/${route}`;
 };
-function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
+const message = (reason: unknown) =>
+  reason instanceof Error
+    ? reason.message
+    : 'Something went wrong. Please try again.';
+
+function Brand() {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d={paths[name]} />
-    </svg>
-  );
-}
-const labels: Record<Run['status'], string> = {
-  verified: 'Verified',
-  partial: 'Partial',
-  failed: 'Failed',
-  couldnt_run: 'Couldn’t run',
-  queued: 'Queued',
-  running: 'Running',
-};
-function Badge({ status }: { status: Run['status'] }) {
-  return (
-    <span className={`badge ${status}`}>
-      <span aria-hidden="true">
-        {status === 'verified' ? '✓' : status === 'failed' ? '×' : '•'}
+    <a href="#/overview" className="brand" aria-label="Exhibit home">
+      <span className="brand-mark">
+        <span />
+        <span />
+        <span />
       </span>
-      {labels[status]}
-    </span>
+      <span>exhibit</span>
+    </a>
   );
 }
-const duration = (seconds: number) =>
-  `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s`;
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, init);
-  if (!response.ok)
-    throw new Error(
-      `The API returned ${response.status}. Check that the service and database are ready.`,
-    );
-  return response.json() as Promise<T>;
-}
-function Modal({
-  title,
-  onClose,
-  children,
+
+function SignIn({
+  client,
+  onSession,
 }: {
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
+  client: WorkspaceClient;
+  onSession: (session: Session) => void;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = ref.current!;
-    dialog.showModal();
-    return () => dialog.close();
-  }, []);
-  return (
-    <dialog ref={ref} onCancel={onClose} aria-labelledby="modal-title">
-      <div className="modal-heading">
-        <h2 id="modal-title">{title}</h2>
-        <button
-          className="icon-button"
-          aria-label="Close dialog"
-          onClick={onClose}
-        >
-          <Icon name="close" />
-        </button>
-      </div>
-      {children}
-    </dialog>
-  );
-}
-function RunDetail({ run, onClose }: { run: Run; onClose: () => void }) {
-  return (
-    <Modal title="Evidence report" onClose={onClose}>
-      {run.sample && (
-        <div className="notice">
-          Sample report · illustrative assertions, no real execution or
-          recording.
-        </div>
-      )}
-      <div className="report-title">
-        <Badge status={run.status} />
-        <h3>{run.title}</h3>
-        <p>
-          {run.repository} · PR #{run.pullRequest}
-        </p>
-      </div>
-      <dl className="provenance">
-        <div>
-          <dt>Run ID</dt>
-          <dd>{run.id}</dd>
-        </div>
-        <div>
-          <dt>Environment</dt>
-          <dd>{run.environment}</dd>
-        </div>
-        <div>
-          <dt>Duration</dt>
-          <dd>{duration(run.durationSeconds)}</dd>
-        </div>
-        <div className="full">
-          <dt>Head SHA</dt>
-          <dd>
-            <code>{run.headSha}</code>
-          </dd>
-        </div>
-      </dl>
-      <h4>Assertions</h4>
-      <ul className="assertions">
-        {run.assertions.map((assertion) => (
-          <li key={assertion.label}>
-            <span className={assertion.passed ? 'pass' : 'fail'}>
-              {assertion.passed ? '✓' : '×'}
-            </span>
-            {assertion.label}
-          </li>
-        ))}
-      </ul>
-      <h4>Not covered</h4>
-      <ul className="not-covered">
-        {run.notCovered.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </ul>
-      <div className="report-foot">
-        {run.sample
-          ? 'Videos and traces will appear here when a trusted runner produces real artifacts.'
-          : 'Artifact delivery is not connected in this foundation.'}
-      </div>
-    </Modal>
-  );
-}
-function ContractCheck({ onClose }: { onClose: () => void }) {
-  const [repository, setRepository] = useState('acme/storefront');
-  const [tenant, setTenant] = useState('exhibit-test');
-  const [kind, setKind] = useState('frontend');
-  const [result, setResult] = useState<Evaluation>();
-  const [pending, setPending] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [pending, setPending] = useState<'login' | 'demo' | null>(null);
   const [error, setError] = useState('');
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setPending('login');
+    setError('');
+    try {
+      onSession(await client.login(email, password));
+    } catch (reason) {
+      setError(message(reason));
+    } finally {
+      setPending(null);
+    }
+  }
   return (
-    <Modal title="Check an evidence contract" onClose={onClose}>
-      <p className="muted">
-        Try the completeness gate with sample metadata. This never starts a run
-        or connects to staging.
-      </p>
-      <form
-        onSubmit={async (event) => {
-          event.preventDefault();
-          setPending(true);
-          setError('');
-          setResult(undefined);
-          try {
-            setResult(
-              await request<Evaluation>('/api/v1/contracts/evaluate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  repository,
-                  pullRequest: 286,
-                  headSha: '0000000000000000000000000000000000000412',
-                  changeKind: kind,
-                  environment: 'staging',
-                  flowIds: ['checkout.saved-address'],
-                  runbookRef: 'agents/runbooks/example.yaml',
-                  testTenant: tenant,
-                }),
-              }),
-            );
-          } catch (reason) {
-            setError((reason as Error).message);
-          } finally {
-            setPending(false);
-          }
-        }}
-      >
-        <label>
-          Repository
-          <input
-            value={repository}
-            onChange={(e) => setRepository(e.target.value)}
-            placeholder="owner/repository"
-          />
-        </label>
-        <label>
-          Change type
-          <select value={kind} onChange={(e) => setKind(e.target.value)}>
-            <option value="frontend">Frontend</option>
-            <option value="backend">Backend</option>
-            <option value="fullstack">Full stack</option>
-            <option value="docs">Documentation</option>
-            <option value="migration">Database migration</option>
-          </select>
-        </label>
-        <label>
-          Test tenant
-          <input
-            value={tenant}
-            onChange={(e) => setTenant(e.target.value)}
-            placeholder="Dedicated staging tenant"
-          />
-        </label>
-        <p className="field-help">
-          Sample PR #286 · staging · checkout.saved-address
-          <br />
-          SHA 000000…0412 · versioned example runbook
-        </p>
-        <button className="primary" type="submit" disabled={pending}>
-          {pending ? 'Checking…' : 'Evaluate contract'}
-          <Icon name="arrow" />
-        </button>
-      </form>
-      {error && (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      )}
-      {result && (
-        <div role="status" className={`evaluation ${result.state}`}>
-          <strong>
-            {result.state === 'ready'
-              ? 'Ready for policy review'
-              : result.state === 'needs_info'
-                ? 'Needs information'
-                : 'Not testable'}
-          </strong>
-          <p>{result.reason}</p>
-          {result.missing.length > 0 && (
-            <p>Missing: {result.missing.join(', ')}</p>
-          )}
+    <div className="auth-page">
+      <header>
+        <Brand />
+        <span className="auth-note">Evidence for every change.</span>
+      </header>
+      <main className="auth-main">
+        <div className="auth-card">
+          <div className="auth-symbol">
+            <Icon name="shield" size={26} />
+          </div>
+          <h1>Welcome to Exhibit</h1>
+          <p className="auth-description">
+            Sign in to your workspace to review evidence,
+            <br className="desktop-only" /> prepare flows, and ship with
+            context.
+          </p>
+          <form onSubmit={submit}>
+            <label htmlFor="email">Email address</label>
+            <input
+              id="email"
+              type="email"
+              autoComplete="username"
+              placeholder="you@company.com"
+              required
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+            {error && (
+              <p className="form-error" role="alert">
+                {error}
+              </p>
+            )}
+            <button className="primary auth-submit" disabled={pending !== null}>
+              {pending === 'login' ? 'Signing in…' : 'Sign in'}
+              <Icon name="arrow" size={17} />
+            </button>
+          </form>
+          <div className="auth-divider">
+            <span>Just taking a look?</span>
+          </div>
+          <button
+            className="secondary auth-submit"
+            disabled={pending !== null}
+            onClick={async () => {
+              setPending('demo');
+              setError('');
+              try {
+                onSession(await client.demo());
+              } catch (reason) {
+                setError(message(reason));
+              } finally {
+                setPending(null);
+              }
+            }}
+          >
+            {pending === 'demo'
+              ? 'Opening sample…'
+              : 'Explore sample workspace'}
+            <Icon name="arrow" size={17} />
+          </button>
+          <p className="auth-help">
+            Sample data only. No repositories are connected and no pull requests
+            are executed.
+          </p>
         </div>
-      )}
-    </Modal>
+        <p className="auth-provision">
+          Need an account? Ask your workspace administrator to provision access.
+        </p>
+      </main>
+      <footer>Commit-linked evidence. Human judgment.</footer>
+    </div>
   );
 }
-function ReferencePage({ page }: { page: 'flows' | 'runbook' }) {
+
+function RunTable({
+  runs,
+  compact = false,
+}: {
+  runs: Run[];
+  compact?: boolean;
+}) {
+  return (
+    <div className="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Pull request</th>
+            <th>Outcome</th>
+            {!compact && <th>Coverage</th>}
+            <th>Duration</th>
+            <th>
+              <span className="sr-only">Open report</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {runs.map((run) => (
+            <tr key={run.id}>
+              <td>
+                <a
+                  className="run-title"
+                  href={`#/runs/${encodeURIComponent(run.id)}`}
+                >
+                  {run.title}
+                </a>
+                <div className="run-meta">
+                  <Icon name="branch" size={13} />
+                  <span>{run.repository}</span>
+                  <span>#{run.pullRequest}</span>
+                  {run.sample && <span className="sample-tag">Sample</span>}
+                </div>
+              </td>
+              <td>
+                <Badge status={run.status} />
+              </td>
+              {!compact && (
+                <td className="coverage">
+                  {run.flows.length} {run.flows.length === 1 ? 'flow' : 'flows'}
+                  <small>
+                    <code>{run.headSha.slice(0, 7)}</code>
+                  </small>
+                </td>
+              )}
+              <td className="duration">{duration(run.durationSeconds)}</td>
+              <td>
+                <a
+                  className="icon-button"
+                  href={`#/runs/${encodeURIComponent(run.id)}`}
+                  aria-label={`Open report for PR ${run.pullRequest}`}
+                >
+                  <Icon name="arrow" size={16} />
+                </a>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Overview({
+  data,
+  setup,
+  session,
+}: {
+  data: RunList;
+  setup: Setup;
+  session: Session;
+}) {
+  const attention = data.runs.filter((run) =>
+    ['partial', 'failed', 'couldnt_run'].includes(run.status),
+  ).length;
+  const steps = [
+    {
+      title: 'Establish your workspace',
+      detail: `${session.workspace.name} · ${session.workspace.role} access`,
+      done: true,
+    },
+    {
+      title: 'Add your repository',
+      detail: setup.repository || 'Choose the repository your team reviews.',
+      done: !!setup.repository,
+    },
+    {
+      title: 'Define the staging boundary',
+      detail:
+        setup.testTenant && setup.runbookRef
+          ? 'Tenant and runbook references saved.'
+          : 'Set a test tenant and versioned runbook.',
+      done: !!setup.stagingUrl && !!setup.testTenant && !!setup.runbookRef,
+    },
+    {
+      title: 'Connect execution',
+      detail: 'Requires an approved isolated runner.',
+      done: false,
+    },
+  ];
   return (
     <>
-      <div className="page-heading">
-        <div className="eyebrow">THE KNOWLEDGE LAYER</div>
-        <h1>
-          {page === 'flows'
-            ? 'Small catalog. Meaningful proof.'
-            : 'A repeatable way to run.'}
-        </h1>
-        <p className="muted">
-          Versioned, reviewable knowledge lives alongside the code.
-        </p>
+      <PageHeading
+        title="Workspace overview"
+        description="A clear view of your evidence, coverage, and next steps."
+        action={
+          <a className="secondary" href="#/setup">
+            <Icon name="setup" size={16} />
+            Workspace setup
+          </a>
+        }
+      />
+      <div className="metric-strip">
+        <div>
+          <span>Evidence runs</span>
+          <strong>{data.runs.length}</strong>
+          <small>
+            Latest {data.mode === 'demo' ? 'sample' : 'stored'} runs
+          </small>
+        </div>
+        <div>
+          <span>Verified</span>
+          <strong>
+            {data.runs.filter((run) => run.status === 'verified').length}
+            <i className="status-point green" />
+          </strong>
+          <small>Recorded assertions passed</small>
+        </div>
+        <div>
+          <span>Needs attention</span>
+          <strong>
+            {attention}
+            <i className="status-point amber" />
+          </strong>
+          <small>Failed, partial, or unable to run</small>
+        </div>
+        <div>
+          <span>Execution</span>
+          <strong className="metric-word">Not connected</strong>
+          <small>Setup does not start a run</small>
+        </div>
       </div>
-      <div className="reference-card">
-        <span className="eyebrow">
-          {page === 'flows' ? 'EXAMPLE FLOW' : 'LOCAL DEVELOPMENT'}
-        </span>
-        <h2>
-          {page === 'flows'
-            ? 'Checkout with a saved address'
-            : 'From a fresh clone to a running app'}
-        </h2>
-        {page === 'flows' ? (
-          <>
-            <p>
-              One focused flow is enough to begin. Define its preconditions,
-              deterministic assertions, and cleanup before connecting a runner.
-            </p>
-            <dl className="reference-list">
-              <div>
-                <dt>Catalog</dt>
-                <dd>
-                  <code>agents/flows/checkout.yaml</code>
-                </dd>
-              </div>
-              <div>
-                <dt>Preconditions</dt>
-                <dd>Dedicated test tenant, saved address, run-scoped cart</dd>
-              </div>
-              <div>
-                <dt>Assertions</dt>
-                <dd>
-                  Address selected, order total matches, confirmation appears
-                </dd>
-              </div>
-              <div>
-                <dt>Cleanup</dt>
-                <dd>Remove only records tagged with the run ID</dd>
-              </div>
-            </dl>
-            <div className="notice">
-              Example only. A customer runbook and seed script must be reviewed
-              before execution.
+      <div className="overview-grid">
+        <section className="panel setup-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Your next steps</h2>
+              <p>Build a trustworthy path from commit to evidence.</p>
             </div>
-          </>
+            <span className="quiet-badge">
+              {steps.filter((step) => step.done).length} of 4
+            </span>
+          </div>
+          <ol className="setup-steps">
+            {steps.map((step, index) => (
+              <li key={step.title}>
+                <span className={`step-number ${step.done ? 'complete' : ''}`}>
+                  {step.done ? <Icon name="check" size={14} /> : index + 1}
+                </span>
+                <div>
+                  <strong>{step.title}</strong>
+                  <p>{step.detail}</p>
+                </div>
+                {index > 0 && index < 3 ? (
+                  <a href="#/setup" className="text-link">
+                    {step.done ? 'Review' : 'Set up'}
+                    <Icon name="arrow" size={15} />
+                  </a>
+                ) : index === 3 ? (
+                  <span className="quiet-text">Pending</span>
+                ) : (
+                  <span className="quiet-text">
+                    {session.mode === 'demo' ? 'Sample' : 'Ready'}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ol>
+        </section>
+        <section className="panel workspace-panel">
+          <div className="panel-heading">
+            <h2>Workspace details</h2>
+            <a className="text-link" href="#/settings">
+              Settings
+              <Icon name="arrow" size={15} />
+            </a>
+          </div>
+          <dl className="detail-list">
+            <div>
+              <dt>Workspace</dt>
+              <dd>{session.workspace.name}</dd>
+            </div>
+            <div>
+              <dt>Your access</dt>
+              <dd className="capitalize">{session.workspace.role}</dd>
+            </div>
+            <div>
+              <dt>Repository</dt>
+              <dd>{setup.repository || 'Not configured'}</dd>
+            </div>
+            <div>
+              <dt>Environment</dt>
+              <dd>Staging only</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+      <section className="panel">
+        <div className="panel-heading">
+          <div>
+            <h2>Recent evidence</h2>
+            <p>What ran, what passed, and what needs a closer look.</p>
+          </div>
+          <a className="text-link" href="#/runs">
+            View all runs
+            <Icon name="arrow" size={15} />
+          </a>
+        </div>
+        {data.runs.length ? (
+          <RunTable runs={data.runs.slice(0, 4)} compact />
         ) : (
-          <>
-            <p>
-              Start with sample evidence, then switch to your checkout’s
-              isolated PostgreSQL database.
-            </p>
-            <ol className="runbook">
-              <li>
-                <strong>Prepare the checkout</strong>
-                <code>make bootstrap</code>
-              </li>
-              <li>
-                <strong>Start web and API</strong>
-                <code>make dev</code>
-              </li>
-              <li>
-                <strong>Verify your changes</strong>
-                <code>make check && make e2e</code>
-              </li>
-              <li>
-                <strong>Work in parallel</strong>
-                <code>make worktree NAME=your-task</code>
-              </li>
-            </ol>
-            <p className="muted">
-              Full instructions: <code>docs/development.md</code>. MVP scope:{' '}
-              <code>docs/product.md</code>.
-            </p>
-          </>
+          <Empty
+            title="Your evidence starts here"
+            action={
+              <a className="secondary" href="#/setup">
+                Set up your workspace
+              </a>
+            }
+          >
+            No runs are stored yet. Configure your repository and staging flow
+            to prepare for execution.
+          </Empty>
         )}
+        <div className="panel-foot">
+          <Icon name="shield" size={14} />
+          <span>Every outcome belongs to an exact commit and environment.</span>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function Runs({
+  data,
+  refresh,
+  busy,
+}: {
+  data: RunList;
+  refresh: () => void;
+  busy: boolean;
+}) {
+  const [query, setQuery] = useState(
+    new URLSearchParams(window.location.hash.split('?')[1]).get('q') || '',
+  );
+  const [filter, setFilter] = useState('all');
+  const visible = data.runs.filter(
+    (run) =>
+      (filter === 'all' || run.status === filter) &&
+      `${run.title} ${run.repository} ${run.pullRequest} ${run.id} ${run.headSha}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
+  );
+  return (
+    <>
+      <PageHeading
+        title="Evidence runs"
+        description="Review observed behavior against the exact pull request commit."
+        action={
+          <button className="secondary" onClick={refresh} disabled={busy}>
+            {busy ? 'Refreshing…' : 'Refresh runs'}
+          </button>
+        }
+      />
+      <section className="panel">
+        <div className="runs-toolbar">
+          <div className="filter-tabs" aria-label="Filter runs">
+            {[
+              ['all', 'All runs'],
+              ['verified', 'Verified'],
+              ['partial', 'Partial'],
+              ['failed', 'Failed'],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                aria-pressed={filter === value}
+                className={filter === value ? 'selected' : ''}
+                onClick={() => setFilter(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <label className="search-field">
+            <Icon name="search" size={16} />
+            <input
+              aria-label="Search runs"
+              placeholder="Search title, repository, or SHA…"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+        </div>
+        {visible.length ? (
+          <RunTable runs={visible} />
+        ) : (
+          <Empty
+            title={
+              data.runs.length
+                ? 'No matching runs'
+                : 'Your evidence starts here'
+            }
+            action={
+              data.runs.length ? (
+                <button
+                  className="secondary"
+                  onClick={() => {
+                    setQuery('');
+                    setFilter('all');
+                  }}
+                >
+                  Clear filters
+                </button>
+              ) : (
+                <a href="#/setup" className="secondary">
+                  Set up your workspace
+                </a>
+              )
+            }
+          >
+            {data.runs.length
+              ? 'Try another search or change the outcome filter.'
+              : 'No runs are stored yet. Repository setup is the next step.'}
+          </Empty>
+        )}
+        <div className="panel-foot split">
+          <span>
+            Showing {visible.length} of {data.runs.length} runs · latest 100
+          </span>
+          <span>Staging evidence</span>
+        </div>
+      </section>
+      <Notice>
+        A complete contract is a starting point. Only a trusted execution with
+        deterministic assertions can produce verified evidence.
+      </Notice>
+    </>
+  );
+}
+
+function RunDetail({ client, id }: { client: WorkspaceClient; id: string }) {
+  const [run, setRun] = useState<Run>();
+  const [error, setError] = useState('');
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setRun(undefined);
+    setError('');
+    client
+      .getRun(id)
+      .then((value) => {
+        if (active) setRun(value);
+      })
+      .catch((reason) => {
+        if (active) setError(message(reason));
+      });
+    return () => {
+      active = false;
+    };
+  }, [client, id, retry]);
+  if (error)
+    return (
+      <div role="alert">
+        <Empty
+          title="Report unavailable"
+          action={
+            <button
+              className="secondary"
+              onClick={() => setRetry((value) => value + 1)}
+            >
+              Try again
+            </button>
+          }
+        >
+          {error}
+        </Empty>
+      </div>
+    );
+  if (!run)
+    return (
+      <div role="status" className="loading-state">
+        Loading evidence report…
+      </div>
+    );
+  return (
+    <>
+      <a href="#/runs" className="back-link">
+        ← All evidence runs
+      </a>
+      <PageHeading
+        title={run.title}
+        description={`${run.repository} · Pull request #${run.pullRequest}`}
+        action={<Badge status={run.status} />}
+      />
+      {run.sample && (
+        <Notice>
+          <strong>Sample report.</strong> Illustrative assertions; no real
+          execution or recording.
+        </Notice>
+      )}
+      <section className="panel report-provenance">
+        <div className="panel-heading">
+          <h2>Run provenance</h2>
+          <span className="quiet-badge">
+            {run.sample ? 'Sample evidence' : 'Stored evidence'}
+          </span>
+        </div>
+        <dl className="provenance-grid">
+          <div>
+            <dt>Run ID</dt>
+            <dd>
+              <code>{run.id}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Environment</dt>
+            <dd>{run.environment}</dd>
+          </div>
+          <div>
+            <dt>Duration</dt>
+            <dd>{duration(run.durationSeconds)}</dd>
+          </div>
+          <div>
+            <dt>Created</dt>
+            <dd>{new Date(run.createdAt).toLocaleString()}</dd>
+          </div>
+          <div className="full">
+            <dt>Head commit</dt>
+            <dd>
+              <code>{run.headSha}</code>
+            </dd>
+          </div>
+        </dl>
+      </section>
+      <div className="report-grid">
+        <section className="panel">
+          <div className="panel-heading">
+            <h2>Assertions</h2>
+            <span className="quiet-badge">
+              {run.assertions.filter((item) => item.passed).length} /{' '}
+              {run.assertions.length} passed
+            </span>
+          </div>
+          {run.assertions.length ? (
+            <ul className="assertion-list">
+              {run.assertions.map((assertion, index) => (
+                <li key={`${index}-${assertion.label}`}>
+                  <span
+                    className={`assertion-symbol ${assertion.passed ? 'pass' : 'fail'}`}
+                  >
+                    {assertion.passed ? (
+                      <Icon name="check" size={14} />
+                    ) : (
+                      <Icon name="close" size={14} />
+                    )}
+                  </span>
+                  <span>{assertion.label}</span>
+                  <span className="quiet-text">
+                    {assertion.passed ? 'Passed' : 'Failed'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <Empty title="No assertions recorded">
+              This report contains no assertion results.
+            </Empty>
+          )}
+        </section>
+        <section className="panel">
+          <div className="panel-heading">
+            <h2>Coverage gaps</h2>
+            <span className="quiet-badge">{run.notCovered.length}</span>
+          </div>
+          {run.notCovered.length ? (
+            <ul className="gap-list">
+              {run.notCovered.map((item, index) => (
+                <li key={`${index}-${item}`}>
+                  <span className="gap-dot" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="panel-copy">
+              No coverage gaps were recorded. This does not establish complete
+              coverage.
+            </p>
+          )}
+        </section>
+      </div>
+      <section className="panel">
+        <div className="panel-heading">
+          <h2>Tested flows</h2>
+        </div>
+        <div className="flow-chips">
+          {run.flows.length ? (
+            run.flows.map((flow) => (
+              <span key={flow}>
+                <Icon name="flow" size={15} />
+                <code>{flow}</code>
+              </span>
+            ))
+          ) : (
+            <span>No flows recorded</span>
+          )}
+        </div>
+      </section>
+      <Notice>
+        Recordings and traces are not attached to this report. Artifact
+        collection must be connected before downloads are available.
+      </Notice>
+    </>
+  );
+}
+
+function SetupPage({
+  initial,
+  session,
+  client,
+  onSave,
+}: {
+  initial: Setup;
+  session: Session;
+  client: WorkspaceClient;
+  onSave: (value: Setup) => void;
+}) {
+  const [draft, setDraft] = useState(initial);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState(false);
+  const canEdit = session.workspace.role === 'owner';
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  const fields: {
+    key: keyof Setup;
+    title: string;
+    placeholder: string;
+    help: string;
+    type?: string;
+  }[] = [
+    {
+      key: 'repository',
+      title: 'Repository',
+      placeholder: 'your-team/your-repository',
+      help: 'Repository metadata only. A GitHub App installation is a separate step.',
+    },
+    {
+      key: 'stagingUrl',
+      title: 'Staging URL',
+      placeholder: 'https://staging.example.com',
+      help: 'The isolated environment for your approved flow. Never production.',
+      type: 'url',
+    },
+    {
+      key: 'testTenant',
+      title: 'Test tenant reference',
+      placeholder: 'exhibit-staging-tenant',
+      help: 'A dedicated tenant reference. Do not paste credentials or access tokens.',
+    },
+    {
+      key: 'runbookRef',
+      title: 'Versioned runbook reference',
+      placeholder:
+        'agents/runbooks/checkout.yaml@0123456789abcdef0123456789abcdef01234567',
+      help: 'Use an immutable reference reviewed by your team. Saving is not approval.',
+    },
+  ];
+  return (
+    <>
+      <PageHeading
+        title="Workspace setup"
+        description="Define where evidence belongs before connecting execution."
+      />
+      <div className="form-layout">
+        <section className="panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Repository & staging</h2>
+              <p>Start with one repository and one dedicated test tenant.</p>
+            </div>
+            <span className="quiet-badge">
+              {canEdit ? 'Owner access' : 'Read only'}
+            </span>
+          </div>
+          <form
+            className="setup-form"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setPending(true);
+              setError('');
+              setSaved(false);
+              try {
+                const result = await client.saveSetup(draft);
+                setDraft(result);
+                onSave(result);
+                setSaved(true);
+              } catch (reason) {
+                setError(message(reason));
+              } finally {
+                setPending(false);
+              }
+            }}
+          >
+            <fieldset disabled={!canEdit || pending}>
+              {fields.map((field) => (
+                <div className="form-field" key={field.key}>
+                  <label htmlFor={field.key}>{field.title}</label>
+                  <input
+                    id={field.key}
+                    type={field.type || 'text'}
+                    value={draft[field.key]}
+                    placeholder={field.placeholder}
+                    maxLength={field.key === 'runbookRef' ? 1000 : 300}
+                    aria-describedby={`${field.key}-help`}
+                    onChange={(event) => {
+                      setDraft({ ...draft, [field.key]: event.target.value });
+                      setSaved(false);
+                    }}
+                  />
+                  <p id={`${field.key}-help`} className="field-help">
+                    {field.help}
+                  </p>
+                </div>
+              ))}
+            </fieldset>
+            {error && (
+              <p role="alert" className="form-error">
+                {error}
+              </p>
+            )}
+            {saved && (
+              <p role="status" className="save-success">
+                <Icon name="check" size={16} />
+                {session.mode === 'demo'
+                  ? 'Sample workspace details saved for this session.'
+                  : 'Workspace details saved.'}
+              </p>
+            )}
+            <div className="form-actions">
+              <span>
+                {canEdit
+                  ? dirty
+                    ? 'You have unsaved changes.'
+                    : 'No unsaved changes.'
+                  : 'Only workspace owners can change setup.'}
+              </span>
+              <button
+                className="primary"
+                disabled={!canEdit || pending || !dirty}
+              >
+                {pending ? 'Saving…' : 'Save workspace details'}
+              </button>
+            </div>
+          </form>
+        </section>
+        <aside className="form-aside">
+          <div className="aside-symbol">
+            <Icon name="shield" size={22} />
+          </div>
+          <h2>Configuration is the first step.</h2>
+          <p>
+            These details help prepare evidence requests. They do not grant
+            access to your repository or staging environment.
+          </p>
+          <div className="integration-state">
+            <span className="status-point amber" />
+            <strong>Execution not connected</strong>
+          </div>
+          <p>
+            A reviewed runbook, trusted GitHub installation, and isolated runner
+            are required before customer code can run.
+          </p>
+          <a className="text-link" href="#/flows">
+            Explore flow requirements
+            <Icon name="arrow" size={15} />
+          </a>
+        </aside>
       </div>
     </>
   );
 }
-export function App() {
-  const [page, setPage] = useState<'runs' | 'flows' | 'runbook'>('runs');
-  const [data, setData] = useState<RunList>();
-  const [error, setError] = useState('');
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState('all');
-  const [selected, setSelected] = useState<Run>();
-  const [contractOpen, setContractOpen] = useState(false);
-  const [refresh, setRefresh] = useState(0);
-  useEffect(() => {
-    const controller = new AbortController();
-    setError('');
-    setData(undefined);
-    request<RunList>('/api/v1/runs', { signal: controller.signal })
-      .then(setData)
-      .catch((reason: Error) => {
-        if (reason.name !== 'AbortError') setError(reason.message);
-      });
-    return () => controller.abort();
-  }, [refresh]);
-  const runs = data?.runs ?? [];
-  const visible = runs.filter(
-    (run) =>
-      (filter === 'all' || run.status === filter) &&
-      `${run.title} ${run.repository} ${run.pullRequest} ${run.id}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
+
+function Flows() {
+  return (
+    <>
+      <PageHeading
+        title="Flow catalog"
+        description="Small, reviewable flows with deterministic expectations."
+      />
+      <Notice>
+        <strong>Example catalog.</strong> This flow demonstrates the required
+        structure. It is not approved for execution.
+      </Notice>
+      <section className="panel">
+        <div className="panel-heading">
+          <div>
+            <div className="eyebrow">EXAMPLE FLOW</div>
+            <h2>Checkout with a saved address</h2>
+            <p>
+              <code>checkout.saved-address</code>
+            </p>
+          </div>
+          <span className="quiet-badge">Example only</span>
+        </div>
+        <div className="flow-definition">
+          <div>
+            <span className="definition-number">01</span>
+            <div>
+              <h3>Preconditions</h3>
+              <p>
+                Dedicated staging tenant, saved address, and a run-scoped cart.
+              </p>
+            </div>
+          </div>
+          <div>
+            <span className="definition-number">02</span>
+            <div>
+              <h3>Deterministic assertions</h3>
+              <p>
+                Saved address is selected, the order total matches, and
+                confirmation appears.
+              </p>
+            </div>
+          </div>
+          <div>
+            <span className="definition-number">03</span>
+            <div>
+              <h3>Cleanup boundary</h3>
+              <p>
+                Remove only data tagged with the current run ID in the approved
+                test tenant.
+              </p>
+            </div>
+          </div>
+          <div>
+            <span className="definition-number">04</span>
+            <div>
+              <h3>Versioned knowledge</h3>
+              <p>
+                <code>agents/flows/checkout.yaml</code>
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="panel-foot">
+          <Icon name="info" size={15} />A flow definition describes the checks.
+          A trusted run provides the evidence.
+        </div>
+      </section>
+    </>
   );
-  const verified = runs.filter((run) => run.status === 'verified').length;
-  const attention = runs.filter((run) =>
-    ['failed', 'partial', 'couldnt_run'].includes(run.status),
-  ).length;
-  const latest = runs[0];
+}
+
+function Settings({
+  session,
+  onLogout,
+  pending,
+}: {
+  session: Session;
+  onLogout: () => void;
+  pending: boolean;
+}) {
+  return (
+    <>
+      <PageHeading
+        title="Workspace settings"
+        description="Your workspace identity, permissions, and current session."
+      />
+      <section className="panel settings-panel">
+        <div className="panel-heading">
+          <h2>Workspace</h2>
+          <span className="quiet-badge">
+            {session.mode === 'demo' ? 'Sample workspace' : 'Private workspace'}
+          </span>
+        </div>
+        <dl className="settings-list">
+          <div>
+            <dt>Workspace name</dt>
+            <dd>{session.workspace.name}</dd>
+          </div>
+          <div>
+            <dt>Workspace ID</dt>
+            <dd>
+              <code>{session.workspace.id}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Account</dt>
+            <dd>
+              {session.user.name}
+              <small>{session.user.email}</small>
+            </dd>
+          </div>
+          <div>
+            <dt>Your role</dt>
+            <dd>
+              <span className="role-badge capitalize">
+                {session.workspace.role}
+              </span>
+              <small>
+                {session.workspace.role === 'owner'
+                  ? 'Manage configuration and review evidence.'
+                  : session.workspace.role === 'editor'
+                    ? 'Prepare flows and review evidence.'
+                    : 'Read workspace configuration and evidence.'}
+              </small>
+            </dd>
+          </div>
+        </dl>
+        <div className="panel-foot split">
+          <span>Permissions are assigned by your workspace administrator.</span>
+          <a className="text-link" href="#/setup">
+            Edit setup
+            <Icon name="arrow" size={15} />
+          </a>
+        </div>
+      </section>
+      <section className="panel settings-panel session-panel">
+        <div>
+          <h2>Current session</h2>
+          <p>
+            {session.mode === 'demo'
+              ? 'This session contains sample data and has no access to real repositories.'
+              : 'Sign out to end your access on this browser.'}
+          </p>
+        </div>
+        <button className="secondary" disabled={pending} onClick={onLogout}>
+          <Icon name="logout" size={16} />
+          {pending ? 'Signing out…' : 'Sign out'}
+        </button>
+      </section>
+    </>
+  );
+}
+
+export function App({ client = previewClient }: { client?: WorkspaceClient }) {
+  const [session, setSession] = useState<Session | null>();
+  const [authError, setAuthError] = useState('');
+  const [route, setRoute] = useState(readRoute);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [data, setData] = useState<RunList>();
+  const [setup, setSetup] = useState<Setup>(emptySetup);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const [logoutPending, setLogoutPending] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [globalSearch, setGlobalSearch] = useState('');
+  useEffect(() => {
+    let active = true;
+    client
+      .session()
+      .then((value) => {
+        if (active) setSession(value);
+      })
+      .catch((reason) => {
+        if (active) {
+          setAuthError(message(reason));
+          setSession(null);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [client, revision]);
+  useEffect(() => {
+    const onHash = () => {
+      setRoute(readRoute());
+      setMobileOpen(false);
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+  useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+      if (event.key === 'Escape') setMobileOpen(false);
+    };
+    window.addEventListener('keydown', shortcut);
+    return () => window.removeEventListener('keydown', shortcut);
+  }, []);
+  useEffect(() => {
+    if (!session) {
+      setData(undefined);
+      return;
+    }
+    let active = true;
+    setLoading(true);
+    setError('');
+    Promise.all([client.listRuns(), client.getSetup()])
+      .then(([runs, config]) => {
+        if (active) {
+          setData(runs);
+          setSetup(config);
+        }
+      })
+      .catch((reason) => {
+        if (active) setError(message(reason));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [client, session, revision]);
+  const page = (route.split('/')[0].split('?')[0] || 'overview') as Page;
+  const selectedPage = navigation.find((item) => item.id === page);
+  const runId =
+    page === 'runs' && route.includes('/')
+      ? decodeURIComponent(route.split('/')[1].split('?')[0])
+      : null;
+  const onSession = (value: Session) => {
+    setSession(value);
+    setAuthError('');
+    if (route === 'sign-in') go('overview');
+  };
+  async function logout() {
+    setLogoutPending(true);
+    try {
+      await client.logout();
+      setSession(null);
+      setData(undefined);
+      setSetup(emptySetup);
+      go('sign-in');
+    } catch (reason) {
+      setError(message(reason));
+    } finally {
+      setLogoutPending(false);
+    }
+  }
+  if (session === undefined)
+    return (
+      <div className="boot-state" role="status">
+        <Brand />
+        <p>Opening your workspace…</p>
+      </div>
+    );
+  if (!session)
+    return (
+      <>
+        {authError && (
+          <div className="auth-error" role="alert">
+            {authError}
+            <button
+              className="text-link"
+              onClick={() => {
+                setAuthError('');
+                setSession(undefined);
+                setRevision((value) => value + 1);
+              }}
+            >
+              Try again
+            </button>
+          </div>
+        )}
+        <SignIn client={client} onSession={onSession} />
+      </>
+    );
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <a className="brand" href="/" aria-label="Exhibit home">
-          <span className="brand-mark">e</span>exhibit
-          <span className="brand-dot">.</span>
-        </a>
-        <div className="workspace">
-          <span className="workspace-avatar">E</span>
-          <div>
-            Exhibit workspace<small>Developer preview</small>
-          </div>
-          <span className="workspace-chevron">⌄</span>
-        </div>
-        <div className="nav-label">WORKSPACE</div>
-        <nav aria-label="Main navigation">
-          {(
-            [
-              ['runs', 'grid', 'Evidence'],
-              ['flows', 'flow', 'Flow catalog'],
-              ['runbook', 'book', 'Runbook'],
-            ] as const
-          ).map(([key, icon, label]) => (
-            <button
-              key={key}
-              className={page === key ? 'nav-item active' : 'nav-item'}
-              onClick={() => setPage(key)}
-              aria-current={page === key ? 'page' : undefined}
-            >
-              <Icon name={icon} />
-              {label}
-              {key === 'runs' && data && (
-                <span className="nav-count">{runs.length}</span>
-              )}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-note">
-          <span className="little-spark">✧</span>
-          <h3>Good changes deserve proof.</h3>
-          <p>Give every reviewer a front-row seat to what works.</p>
-          <button onClick={() => setPage('runbook')}>
-            Read the runbook
-            <Icon name="arrow" size={15} />
+      <a
+        className="skip-link"
+        href="#main-content"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById('main-content')?.focus();
+        }}
+      >
+        Skip to content
+      </a>
+      {mobileOpen && (
+        <button
+          className="nav-backdrop"
+          aria-label="Close navigation"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+      <aside
+        className={`sidebar ${mobileOpen ? 'is-open' : ''}`}
+        aria-label="Workspace navigation"
+      >
+        <div className="sidebar-brand">
+          <Brand />
+          <button
+            className="icon-button mobile-close"
+            aria-label="Close navigation"
+            onClick={() => setMobileOpen(false)}
+          >
+            <Icon name="close" />
           </button>
         </div>
-        <div className="sidebar-footer">
-          <span className="avatar">EX</span>
-          <div>
-            Exhibit<small>MVP foundation · v0.1</small>
+        <a className="workspace-switch" href="#/settings">
+          <span className="workspace-avatar">
+            {session.workspace.name.charAt(0).toUpperCase()}
+          </span>
+          <span>
+            <strong>{session.workspace.name}</strong>
+            <small>
+              {session.mode === 'demo'
+                ? 'Sample workspace'
+                : 'Private workspace'}
+            </small>
+          </span>
+          <span className="workspace-caret">⌄</span>
+        </a>
+        <div className="nav-group-label">WORKSPACE</div>
+        <nav aria-label="Main navigation">
+          {navigation.map((item) => (
+            <a
+              key={item.id}
+              href={`#/${item.id}`}
+              className={`nav-item ${page === item.id ? 'active' : ''}`}
+              aria-current={page === item.id ? 'page' : undefined}
+            >
+              <Icon name={item.icon} />
+              {item.label}
+              {item.id === 'runs' && data && (
+                <span className="nav-count">{data.runs.length}</span>
+              )}
+            </a>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="boundary-note">
+            <Icon name="shield" size={17} />
+            <span>
+              Staging only<small>Production stays untouched.</small>
+            </span>
           </div>
+          <a href="#/settings" className="account-link">
+            <span className="account-avatar">
+              {session.user.name
+                .split(' ')
+                .map((part) => part[0])
+                .join('')
+                .slice(0, 2)}
+            </span>
+            <span>
+              <strong>{session.user.name}</strong>
+              <small className="capitalize">{session.workspace.role}</small>
+            </span>
+            <Icon name="settings" size={16} />
+          </a>
         </div>
       </aside>
       <div className="main-shell">
         <header className="topbar">
           <div className="breadcrumb">
-            Workspace<span>/</span>
+            <button
+              className="icon-button mobile-menu"
+              aria-label="Open navigation"
+              aria-expanded={mobileOpen}
+              onClick={() => setMobileOpen(true)}
+            >
+              <Icon name="menu" />
+            </button>
+            <span>Workspace</span>
+            <span className="slash">/</span>
             <strong>
-              {page === 'runs'
-                ? 'Evidence'
-                : page === 'flows'
-                  ? 'Flow catalog'
-                  : 'Runbook'}
+              {selectedPage?.label || 'Overview'}
+              {runId ? ' / Report' : ''}
             </strong>
           </div>
-          <span className="preview-label">
-            <span />
-            {data?.mode === 'postgres' ? 'Local database' : 'Developer preview'}
+          <form
+            className="global-search"
+            onSubmit={(event) => {
+              event.preventDefault();
+              go(`runs?q=${encodeURIComponent(globalSearch)}`);
+            }}
+          >
+            <Icon name="search" size={16} />
+            <input
+              ref={searchRef}
+              aria-label="Quick search"
+              placeholder="Quick search…"
+              value={globalSearch}
+              onChange={(event) => setGlobalSearch(event.target.value)}
+            />
+            <kbd>⌘ K</kbd>
+          </form>
+          <span className="topbar-status">
+            <span className="status-point" />
+            {session.mode === 'demo' ? 'Sample mode' : 'Private workspace'}
           </span>
         </header>
-        <main>
-          {page !== 'runs' ? (
-            <ReferencePage page={page} />
-          ) : (
-            <>
-              <div className="page-heading heading-row">
-                <div>
-                  <div className="eyebrow">
-                    LESS GUESSWORK. MORE CONFIDENCE.
-                  </div>
-                  <h1>The proof is in the pull request.</h1>
-                  <p className="muted">
-                    See what changed. See it working. Know what to ship.
-                  </p>
-                </div>
-                <button
-                  className="primary"
-                  onClick={() => setContractOpen(true)}
-                >
-                  <Icon name="plus" size={17} />
-                  Check a contract
-                </button>
-              </div>
-              {(data?.mode === 'demo' || runs.some((run) => run.sample)) && (
-                <div className="demo-notice">
-                  <span className="demo-tag">SAMPLE DATA</span>
-                  <span>
-                    You’re exploring illustrative evidence. No PRs have been
-                    executed.
-                  </span>
-                  <button onClick={() => setPage('runbook')}>
-                    Set up your workspace
-                    <Icon name="arrow" size={15} />
-                  </button>
-                </div>
-              )}
-              <div className="stats">
-                <div className="stat">
-                  <span>
-                    Evidence runs
-                    <Icon name="branch" />
-                  </span>
-                  <strong>
-                    {data ? runs.length.toString().padStart(2, '0') : '—'}
-                  </strong>
-                  <small>
-                    Latest {data?.mode === 'demo' ? 'sample' : 'stored'} runs
-                  </small>
-                </div>
-                <div className="stat">
-                  <span>
-                    Verified
-                    <Icon name="check" />
-                  </span>
-                  <strong>
-                    {data ? verified.toString().padStart(2, '0') : '—'}
-                    <span className="stat-dot green" />
-                  </strong>
-                  <small>All recorded assertions passed</small>
-                </div>
-                <div className="stat">
-                  <span>
-                    Needs a closer look
-                    <Icon name="search" />
-                  </span>
-                  <strong>
-                    {data ? attention.toString().padStart(2, '0') : '—'}
-                    <span className="stat-dot amber" />
-                  </strong>
-                  <small>Partial, failed, or unable to run</small>
-                </div>
-              </div>
-              <section className="runs-panel" aria-labelledby="runs-title">
-                <div className="panel-heading">
-                  <div>
-                    <h2 id="runs-title">
-                      Evidence runs
-                      <span className="count-pill">{runs.length}</span>
-                    </h2>
-                    <p>A clear trail from code change to observed behavior.</p>
-                  </div>
-                  <button
-                    className="subtle-button"
-                    onClick={() => setRefresh((value) => value + 1)}
-                  >
-                    Refresh
-                  </button>
-                </div>
-                <div className="table-toolbar">
-                  <div className="filters" aria-label="Filter runs">
-                    {[
-                      ['all', 'All runs'],
-                      ['verified', 'Verified'],
-                      ['partial', 'Partial'],
-                      ['failed', 'Failed'],
-                    ].map(([value, label]) => (
-                      <button
-                        key={value}
-                        aria-pressed={filter === value}
-                        className={filter === value ? 'selected' : ''}
-                        onClick={() => setFilter(value)}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <label className="search-field">
-                    <Icon name="search" size={16} />
-                    <input
-                      aria-label="Search runs"
-                      placeholder="Search runs…"
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                    />
-                  </label>
-                </div>
-                {error ? (
-                  <div role="alert" className="empty-state">
-                    <h3>Evidence is unavailable</h3>
-                    <p>{error}</p>
-                    <button
-                      className="subtle-button"
-                      onClick={() => setRefresh((value) => value + 1)}
-                    >
-                      Try again
-                    </button>
-                  </div>
-                ) : !data ? (
-                  <div role="status" className="empty-state">
-                    Loading evidence…
-                  </div>
-                ) : visible.length === 0 ? (
-                  <div className="empty-state">
-                    <h3>
-                      {runs.length
-                        ? 'No matching runs'
-                        : 'Your evidence starts here'}
-                    </h3>
-                    <p>
-                      {runs.length
-                        ? 'Try another search or status filter.'
-                        : 'No runs are stored yet. Connect a runner in the next milestone, or seed the local sample records.'}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="table-scroll">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Pull request</th>
-                          <th>Outcome</th>
-                          <th>Coverage</th>
-                          <th>Duration</th>
-                          <th>
-                            <span className="sr-only">Report</span>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {visible.map((run) => (
-                          <tr key={run.id}>
-                            <td>
-                              <button
-                                className="run-title"
-                                onClick={() => setSelected(run)}
-                              >
-                                {run.title}
-                              </button>
-                              <div className="run-meta">
-                                <Icon name="branch" size={13} />
-                                {run.repository}
-                                <span>#{run.pullRequest}</span>
-                                {run.sample && (
-                                  <span className="sample-label">sample</span>
-                                )}
-                              </div>
-                            </td>
-                            <td>
-                              <Badge status={run.status} />
-                            </td>
-                            <td className="coverage">
-                              {run.flows.length}{' '}
-                              {run.flows.length === 1 ? 'flow' : 'flows'}
-                              <small>
-                                {run.headSha.slice(0, 7)}…
-                                {run.headSha.slice(-4)}
-                              </small>
-                            </td>
-                            <td className="run-duration">
-                              {duration(run.durationSeconds)}
-                            </td>
-                            <td>
-                              <button
-                                className="icon-button"
-                                aria-label={`Open report for PR ${run.pullRequest}`}
-                                onClick={() => setSelected(run)}
-                              >
-                                <Icon name="arrow" size={17} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-                <div className="table-footer">
-                  <span>
-                    {data
-                      ? `Showing ${visible.length} of ${runs.length} runs`
-                      : 'Connecting to the API'}
-                  </span>
-                  <span>
-                    <span className="small-dot" />
-                    Staging evidence · never production
-                  </span>
-                </div>
-              </section>
-              <div className="bottom-grid">
-                <section className="proof-card">
-                  <div className="proof-icon">
-                    <Icon name="check" size={23} />
-                  </div>
-                  <div>
-                    <div className="eyebrow">EVIDENCE, WITH CONTEXT</div>
-                    <h2>A verdict is only the beginning.</h2>
-                    <p>
-                      Every report pairs assertions with the exact commit,
-                      tested flows, and an honest account of what wasn’t
-                      covered.
-                    </p>
-                    {latest && (
-                      <button
-                        className="text-link"
-                        onClick={() => setSelected(latest)}
-                      >
-                        Explore a {latest.sample ? 'sample ' : ''}report
-                        <Icon name="arrow" size={16} />
-                      </button>
-                    )}
-                  </div>
-                </section>
-                <section className="how-card">
-                  <h3>From change to confidence</h3>
-                  <ol>
-                    <li>
-                      <span>01</span>Define the flow
-                    </li>
-                    <li>
-                      <span>02</span>Run against staging
-                    </li>
-                    <li>
-                      <span>03</span>Review the evidence
-                    </li>
-                  </ol>
-                  <small>Execution arrives in the next milestone.</small>
-                </section>
-              </div>
-              <footer className="page-footer">
-                Built for human judgment.
-                <span>exhibit · evidence over assumptions</span>
-              </footer>
-            </>
+        <main id="main-content" tabIndex={-1}>
+          {session.mode === 'demo' && (
+            <div className="sample-banner">
+              <span className="sample-label">SAMPLE DATA</span>
+              <span>
+                You’re exploring illustrative evidence. No pull requests have
+                been executed.
+              </span>
+              <a href="#/setup">
+                Workspace setup
+                <Icon name="arrow" size={14} />
+              </a>
+            </div>
           )}
+          {error ? (
+            <div role="alert" className="panel">
+              <Empty
+                title="Workspace is unavailable"
+                action={
+                  <button
+                    className="secondary"
+                    onClick={() => setRevision((value) => value + 1)}
+                  >
+                    Try again
+                  </button>
+                }
+              >
+                {error}
+              </Empty>
+            </div>
+          ) : !data ? (
+            <div className="loading-state" role="status">
+              Loading workspace evidence…
+            </div>
+          ) : runId ? (
+            <RunDetail client={client} id={runId} />
+          ) : page === 'runs' ? (
+            <Runs
+              key={route}
+              data={data}
+              busy={loading}
+              refresh={() => setRevision((value) => value + 1)}
+            />
+          ) : page === 'setup' ? (
+            <SetupPage
+              key={session.workspace.id}
+              initial={setup}
+              session={session}
+              client={client}
+              onSave={setSetup}
+            />
+          ) : page === 'flows' ? (
+            <Flows />
+          ) : page === 'settings' ? (
+            <Settings
+              session={session}
+              onLogout={logout}
+              pending={logoutPending}
+            />
+          ) : (
+            <Overview data={data} setup={setup} session={session} />
+          )}
+          <footer className="page-footer">
+            <span>Exhibit · evidence with context</span>
+            <span>Built for human review.</span>
+          </footer>
         </main>
       </div>
-      {selected && (
-        <RunDetail run={selected} onClose={() => setSelected(undefined)} />
-      )}
-      {contractOpen && <ContractCheck onClose={() => setContractOpen(false)} />}
     </div>
   );
 }
