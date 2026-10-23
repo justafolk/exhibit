@@ -31,6 +31,17 @@ def collect_tests(suites):
 
 
 def capture(playwright, root, repository, sha, run_id, attempt):
+    require(type(playwright) is dict, "Playwright report must be an object")
+    config = playwright.get("config")
+    require(type(config) is dict and type(config.get("metadata")) is dict,
+            "Playwright report is missing capture provenance")
+    provenance = config["metadata"].get("exhibitCapture")
+    require(type(provenance) is dict and type(provenance.get("schemaVersion")) is int
+            and provenance["schemaVersion"] == 1, "Playwright report is missing supported capture provenance")
+    require(provenance.get("headSha") == sha,
+            "Playwright report was recorded at a different commit; refusing stale capture")
+    require(provenance.get("dirty") is False,
+            "Playwright capture started from a dirty or unknown checkout")
     root = root.resolve()
     require(root.is_dir(), "test-results artifact directory is missing")
     stats = playwright.get("stats", {})

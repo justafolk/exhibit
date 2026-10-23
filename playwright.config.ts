@@ -1,10 +1,31 @@
 import { defineConfig, devices } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
 // Dedicated test ports are inherited by both dev children; no server reuse can
 // accidentally test another worktree. Override when running suites concurrently.
 const webPort = process.env.E2E_WEB_PORT || '15173';
 const apiPort = process.env.E2E_API_PORT || '18080';
+// Capture the checkout when Playwright starts, not later during collection.
+// A JSON report remains self-reported metadata, never a trusted verdict.
+const captureMetadata =
+  process.env.EXHIBIT_CAPTURE === '1'
+    ? {
+        exhibitCapture: {
+          schemaVersion: 1,
+          headSha: execFileSync('git', ['rev-parse', 'HEAD'], {
+            cwd: __dirname,
+            encoding: 'utf8',
+          }).trim(),
+          dirty:
+            execFileSync('git', ['status', '--porcelain'], {
+              cwd: __dirname,
+              encoding: 'utf8',
+            }).trim().length > 0,
+        },
+      }
+    : {};
 export default defineConfig({
   testDir: './tests/e2e',
+  metadata: captureMetadata,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
