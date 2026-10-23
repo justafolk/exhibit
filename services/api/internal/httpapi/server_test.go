@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -60,6 +62,27 @@ func TestUnavailableStore(t *testing.T) {
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		if rec.Code != 503 || strings.Contains(rec.Body.String(), "password") {
 			t.Fatalf("unsafe failure: %d %s", rec.Code, rec.Body)
+		}
+	}
+}
+
+func TestStaticAndAPIRoutesCoexist(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("<html>Exhibit</html>"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	h := Server{Store: store.Demo{}, StaticDir: dir}.Handler()
+	for _, tt := range []struct {
+		method, path string
+		status       int
+	}{
+		{"GET", "/", 200}, {"HEAD", "/", 200}, {"GET", "/missing.js", 404},
+		{"POST", "/", 405}, {"GET", "/api/healthz", 200}, {"GET", "/api/unknown", 404},
+	} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(tt.method, tt.path, nil))
+		if rec.Code != tt.status {
+			t.Fatalf("%s %s: got %d want %d", tt.method, tt.path, rec.Code, tt.status)
 		}
 	}
 }

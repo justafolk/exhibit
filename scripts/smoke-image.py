@@ -39,4 +39,4 @@ try:
         assert version["application"] == "exhibit"
     print("Container smoke passed: static app, readiness, sample API, version and CSP")
 finally:
-    subprocess.run(["docker", "stop", "--time", "5", container], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(["docker", "stop", "--time", "5", container], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

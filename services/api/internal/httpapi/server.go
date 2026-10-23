@@ -94,7 +94,12 @@ func (s Server) Handler() http.Handler {
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { failure(w, 404, "endpoint not found") })
 	if s.StaticDir != "" {
 		files := http.FileServer(http.Dir(s.StaticDir))
-		mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet && r.Method != http.MethodHead {
+				w.Header().Set("Allow", "GET, HEAD")
+				failure(w, http.StatusMethodNotAllowed, "method not allowed")
+				return
+			}
 			if r.URL.Path != "/" {
 				clean := filepath.Join(s.StaticDir, filepath.FromSlash(strings.TrimPrefix(r.URL.Path, "/")))
 				if _, err := os.Stat(clean); err != nil {
