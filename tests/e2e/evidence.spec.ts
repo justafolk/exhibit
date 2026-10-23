@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 
 async function openSample(page: Page, route = 'runs') {
   await page.goto(`/#/${route}`);
@@ -44,10 +45,57 @@ test('status filters and search work together', async ({ page }) => {
   await expect(page.locator('tbody tr')).toHaveCount(2);
   await page.getByRole('textbox', { name: 'Search runs' }).fill('empty states');
   await expect(page.locator('tbody tr')).toHaveCount(1);
+  await expect(page).toHaveURL(/status=verified/);
+  await page.reload();
+  await expect(page.getByRole('textbox', { name: 'Search runs' })).toHaveValue(
+    'empty states',
+  );
+  await expect(page.locator('tbody tr')).toHaveCount(1);
   await page
     .getByRole('textbox', { name: 'Search runs' })
     .fill('does-not-exist');
   await expect(page.getByText('No matching runs')).toBeVisible();
+});
+
+test('portable reports preserve full provenance and sample qualification', async ({
+  page,
+}) => {
+  await openSample(page);
+  await page.getByRole('link', { name: 'Open report for PR 286' }).click();
+  const downloaded = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download report' }).click();
+  const download = await downloaded;
+  expect(download.suggestedFilename()).toBe('exhibit-exh-1042.md');
+  const report = await readFile((await download.path())!, 'utf8');
+  expect(report).toContain('SAMPLE');
+  expect(report).toContain('0000000000000000000000000000000000000412');
+  expect(report).toContain('Production payment processing');
+  expect(report).toContain('acme/storefront');
+});
+
+test('revoked sessions return the browser to sign-in', async ({
+  page,
+  baseURL,
+}) => {
+  await openSample(page);
+  await expect(
+    page.getByRole('button', { name: 'Refresh runs' }),
+  ).toBeEnabled();
+  const session = await (await page.request.get('/api/v1/auth/session')).json();
+  expect(
+    (
+      await page.request.post('/api/v1/auth/logout', {
+        data: {},
+        headers: { Origin: baseURL!, 'X-CSRF-Token': session.csrfToken },
+      })
+    ).ok(),
+  ).toBe(true);
+  await page.getByRole('button', { name: 'Refresh runs' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Sign in', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('session has expired');
+  await expect(page.locator('tbody tr')).toHaveCount(0);
 });
 
 test('workspace setup saves through the API and survives reload', async ({
@@ -108,6 +156,11 @@ test('mobile navigation and logout are usable', async ({ page }) => {
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+  await page.getByRole('button', { name: 'Open navigation' }).click();
+  await page.keyboard.press('Escape');
+  await expect(
+    page.getByRole('button', { name: 'Open navigation' }),
+  ).toBeFocused();
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await page.getByRole('link', { name: 'Flow catalog', exact: true }).click();
   await expect(

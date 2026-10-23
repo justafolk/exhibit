@@ -11,8 +11,14 @@ Go serves the built static client and API from one process. `EXHIBIT_STORE=demo`
 embedded fixtures; `postgres` reads actual metadata. There is no fallback from a failed
 real database to demo data. Readiness checks schema availability as well as connectivity.
 
-The API exposes health, readiness, build version, the latest 100 runs, run details and
-contract completeness evaluation. It has no mutation endpoint that schedules work.
+The API exposes health, readiness, build version, authenticated run reads, workspace
+setup and contract completeness evaluation. Opaque cookie sessions identify a user,
+workspace and server-enforced role. PostgreSQL stores password hashes, session hashes,
+memberships and configuration; demo sessions use isolated in-memory configuration.
+An operator CLI creates the first owner. There is no public registration or account recovery.
+Mutations require an exact allowed origin and a session-bound CSRF token. Every real
+run query requires workspace scope; legacy records remain in an unclaimed sample workspace.
+There is no mutation endpoint that schedules customer execution.
 OpenAPI is the shared boundary; TypeScript types are generated and CI detects drift.
 
 PostgreSQL holds relational metadata and JSONB assertions. Artifacts will live in private
@@ -41,7 +47,8 @@ Provider adapters remain unimplemented until one pilot flow defines their requir
 - Contract completeness versus execution authorization: only trusted policy authorizes work.
 - Run output versus verification: a trusted verifier derives the verdict from assertions.
 - Metadata versus evidence blobs: small relational rows versus expiring private objects.
-- Current scaffold versus future product: authentication and execution are explicit backlog work.
+- Current workspace versus future product: operational identity recovery, GitHub ingress,
+  isolated execution and trusted artifact delivery remain separate integration work.
 
 Nested `AGENTS.md` files describe module conventions. Keep dependencies pointed inward:
 HTTP depends on evidence/store; domain rules do not depend on HTTP. External integrations
