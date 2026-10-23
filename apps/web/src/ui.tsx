@@ -19,8 +19,24 @@ export type IconName =
   | 'shield'
   | 'external'
   | 'file'
-  | 'info';
+  | 'info'
+  | 'video'
+  | 'play'
+  | 'pause'
+  | 'record'
+  | 'upload'
+  | 'download'
+  | 'muted'
+  | 'volume';
 const paths: Record<IconName, string> = {
+  video: 'M3 5h12v14H3z M15 10l6-4v12l-6-4',
+  play: 'M7 4l14 8-14 8z',
+  pause: 'M7 4v16 M17 4v16',
+  record: 'M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0',
+  upload: 'M12 16V3 M7 8l5-5 5 5 M4 16v5h16v-5',
+  download: 'M12 3v13 M7 11l5 5 5-5 M4 17v4h16v-4',
+  muted: 'M11 4L6 8H2v8h4l5 4z M16 9l6 6 M16 15l6-6',
+  volume: 'M11 4L6 8H2v8h4l5 4z M15 8a6 6 0 0 1 0 8 M18 4a11 11 0 0 1 0 16',
   overview: 'M3 10l9-7 9 7v11h-6v-7H9v7H3z',
   runs: 'M4 3h12l4 4v14H4z M8 11h8 M8 15h8 M8 7h3',
   setup: 'M4 7h16 M4 17h16 M8 4v6 M16 14v6',

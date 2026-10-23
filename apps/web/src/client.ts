@@ -11,6 +11,11 @@ export type FlowInput = components['schemas']['FlowInput'];
 export type EvidenceContract = components['schemas']['EvidenceContract'];
 export type ContractDraft = components['schemas']['ContractDraft'];
 export type Evaluation = components['schemas']['Evaluation'];
+export type Recording = components['schemas']['Recording'];
+export type RecordingInput = components['schemas']['RecordingInput'];
+export type RecordingChapter = components['schemas']['RecordingChapter'];
+export type RecordingPresentation =
+  components['schemas']['RecordingPresentation'];
 export const emptySetup: Setup = {
   repository: '',
   stagingUrl: '',
@@ -33,6 +38,8 @@ export interface WorkspaceClient {
   getDraft(): Promise<ContractDraft>;
   saveDraft(draft: ContractDraft): Promise<ContractDraft>;
   evaluateContract(draft: ContractDraft): Promise<Evaluation>;
+  listRecordings(): Promise<{ recordings: Recording[] }>;
+  createRecording(input: RecordingInput): Promise<Recording>;
 }
 
 export class APIError extends Error {
@@ -128,4 +135,6 @@ export const apiClient: WorkspaceClient = {
   saveDraft: (draft) => request<ContractDraft>('/contract-draft', 'PUT', draft),
   evaluateContract: (draft) =>
     request<Evaluation>('/contracts/evaluate', 'POST', draft),
+  listRecordings: () => request<{ recordings: Recording[] }>('/recordings'),
+  createRecording: (input) => request<Recording>('/recordings', 'POST', input),
 };
