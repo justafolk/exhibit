@@ -255,6 +255,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/recordings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Latest 100 workspace manual recording declarations, ordered by createdAt and id descending. No media is stored or served. */
+        get: operations["listRecordings"];
+        put?: never;
+        /** @description Owner/editor only. Saves immutable declared metadata, not media bytes. A supplied SHA-256 is unverified; the server fixes origin=manual, verification=unverified and mediaStored=false. Related runs must belong to the same workspace. No run verdict is modified. */
+        post: operations["createRecording"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recordings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getRecording"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Latest 50 workspace flow, contract and recording authorship events. This is not an execution or approval audit. No raw configuration contents are returned. */
+        get: operations["listActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -389,6 +440,74 @@ export interface components {
             flowIds: string[];
             runbookRef: string;
             testTenant: string;
+        };
+        RecordingChapter: {
+            label: string;
+            /** @description Must be within the recording duration */
+            atSeconds: number;
+        };
+        RecordingPresentation: {
+            /** @enum {string} */
+            frame: "paper" | "mist" | "slate";
+            zoom: number;
+            playbackRate: number;
+        };
+        /** @description Manual media declaration. No bytes are uploaded. UTF-8 byte limits apply to strings; NUL is rejected. All numeric values must be finite. */
+        RecordingInput: {
+            name: string;
+            /** @description A filename without path separators or control characters */
+            fileName: string;
+            /** @description Client-declared checksum; the server has no media bytes to verify it */
+            sha256: string;
+            bytes: number;
+            /** @enum {string} */
+            mediaType: "video/webm" | "video/mp4";
+            durationSeconds: number;
+            /** @description Related workspace run ID; empty means unattached */
+            runId: string;
+            chapters: components["schemas"]["RecordingChapter"][];
+            presentation: components["schemas"]["RecordingPresentation"];
+        };
+        Recording: {
+            name: string;
+            /** @description A filename without path separators or control characters */
+            fileName: string;
+            /** @description Client-declared checksum; the server has no media bytes to verify it */
+            sha256: string;
+            bytes: number;
+            /** @enum {string} */
+            mediaType: "video/webm" | "video/mp4";
+            durationSeconds: number;
+            /** @description Related workspace run ID; empty means unattached */
+            runId: string;
+            chapters: components["schemas"]["RecordingChapter"][];
+            presentation: components["schemas"]["RecordingPresentation"];
+            id: string;
+            /** @enum {string} */
+            origin: "manual";
+            /** @enum {string} */
+            verification: "unverified";
+            /** @enum {boolean} */
+            mediaStored: false;
+            /** Format: date-time */
+            createdAt: string;
+            /** @description Author user ID */
+            createdBy: string;
+        };
+        RecordingList: {
+            recordings: components["schemas"]["Recording"][];
+        };
+        Activity: {
+            id: string;
+            /** @enum {string} */
+            action: "flow.created" | "flow.updated" | "contract.saved" | "recording.created";
+            objectId: string;
+            actorId: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ActivityList: {
+            events: components["schemas"]["Activity"][];
         };
     };
     responses: {
@@ -1385,6 +1504,221 @@ export interface operations {
                 content?: never;
             };
             /** @description Preparation store unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listRecordings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Saved metadata */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordingList"];
+                };
+            };
+            /** @description Invalid, oversized or forged metadata */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Sign in required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Editor permission or CSRF check failed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Recording or related run not found in this workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Metadata store unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createRecording: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token; mutations also require same-origin Origin header. */
+                "X-CSRF-Token": components["parameters"]["CSRFToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordingInput"];
+            };
+        };
+        responses: {
+            /** @description Saved manual declaration */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recording"];
+                };
+            };
+            /** @description Invalid, oversized or forged metadata */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Sign in required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Editor permission or CSRF check failed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Recording or related run not found in this workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Workspace has reached 100 recording metadata records */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Metadata store unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getRecording: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Manual metadata; media remains local */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recording"];
+                };
+            };
+            /** @description Invalid, oversized or forged metadata */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Sign in required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Editor permission or CSRF check failed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Recording or related run not found in this workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Metadata store unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listActivity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recent preparation activity */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityList"];
+                };
+            };
+            /** @description Sign in required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Metadata store unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;

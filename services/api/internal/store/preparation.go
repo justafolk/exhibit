@@ -66,6 +66,7 @@ func (m *MemoryIdentity) CreateFlow(_ context.Context, workspace, actor string, 
 	}
 	flow := Flow{ID: "flow-" + auth.Token(), FlowInput: input, UpdatedAt: time.Now().UTC(), UpdatedBy: actor}
 	m.flows[workspace][flow.ID] = cloneFlow(flow)
+	m.recordActivityLocked(workspace, actor, "flow.created", flow.ID)
 	return flow, nil
 }
 func (m *MemoryIdentity) PatchFlow(_ context.Context, workspace, actor, id string, patch evidence.FlowPatch) (Flow, error) {
@@ -81,6 +82,7 @@ func (m *MemoryIdentity) PatchFlow(_ context.Context, workspace, actor, id strin
 	}
 	flow := Flow{ID: id, FlowInput: input, UpdatedAt: time.Now().UTC(), UpdatedBy: actor}
 	m.flows[workspace][id] = cloneFlow(flow)
+	m.recordActivityLocked(workspace, actor, "flow.updated", id)
 	return flow, nil
 }
 func (m *MemoryIdentity) Draft(_ context.Context, workspace string) (evidence.Contract, error) {
@@ -95,5 +97,6 @@ func (m *MemoryIdentity) SaveDraft(_ context.Context, workspace, actor string, d
 	defer m.mu.Unlock()
 	draft.FlowIDs = append([]string{}, draft.FlowIDs...)
 	m.drafts[workspace] = draft
+	m.recordActivityLocked(workspace, actor, "contract.saved", workspace)
 	return nil
 }

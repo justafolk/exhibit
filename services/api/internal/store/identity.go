@@ -61,15 +61,17 @@ type memorySession struct {
 // MemoryIdentity is only for explicitly labelled demo sessions. Each session has
 // its own workspace; nothing is persisted or connected to a real account.
 type MemoryIdentity struct {
-	mu       sync.Mutex
-	sessions map[string]memorySession
-	settings map[string]Setup
-	flows    map[string]map[string]Flow
-	drafts   map[string]evidence.Contract
+	mu         sync.Mutex
+	sessions   map[string]memorySession
+	settings   map[string]Setup
+	flows      map[string]map[string]Flow
+	drafts     map[string]evidence.Contract
+	recordings map[string]map[string]Recording
+	activity   map[string][]Activity
 }
 
 func NewMemoryIdentity() *MemoryIdentity {
-	return &MemoryIdentity{sessions: map[string]memorySession{}, settings: map[string]Setup{}, flows: map[string]map[string]Flow{}, drafts: map[string]evidence.Contract{}}
+	return &MemoryIdentity{sessions: map[string]memorySession{}, settings: map[string]Setup{}, flows: map[string]map[string]Flow{}, drafts: map[string]evidence.Contract{}, recordings: map[string]map[string]Recording{}, activity: map[string][]Activity{}}
 }
 func (m *MemoryIdentity) Account(context.Context, string) (Account, error) {
 	return Account{}, ErrUnauthorized
@@ -83,6 +85,8 @@ func (m *MemoryIdentity) SaveSession(_ context.Context, hash string, identity Id
 			delete(m.settings, value.Identity.Workspace.ID)
 			delete(m.flows, value.Identity.Workspace.ID)
 			delete(m.drafts, value.Identity.Workspace.ID)
+			delete(m.recordings, value.Identity.Workspace.ID)
+			delete(m.activity, value.Identity.Workspace.ID)
 		}
 	}
 	if len(m.sessions) >= 1000 {
@@ -107,6 +111,8 @@ func (m *MemoryIdentity) RevokeSession(_ context.Context, hash string) error {
 		delete(m.settings, value.Identity.Workspace.ID)
 		delete(m.flows, value.Identity.Workspace.ID)
 		delete(m.drafts, value.Identity.Workspace.ID)
+		delete(m.recordings, value.Identity.Workspace.ID)
+		delete(m.activity, value.Identity.Workspace.ID)
 	}
 	delete(m.sessions, hash)
 	return nil

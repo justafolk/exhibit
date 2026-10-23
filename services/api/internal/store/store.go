@@ -95,7 +95,7 @@ func (p Postgres) Ping(ctx context.Context) error {
 		return err
 	}
 	// Ready means migrations exist too, not merely an open TCP socket.
-	_, err := p.Pool.Exec(ctx, "SELECT r.workspace_id, s.token_hash, f.id, d.workspace_id FROM evidence_runs r CROSS JOIN sessions s CROSS JOIN flow_definitions f CROSS JOIN contract_drafts d LIMIT 0")
+	_, err := p.Pool.Exec(ctx, "SELECT r.workspace_id, s.token_hash, f.id, d.workspace_id FROM evidence_runs r CROSS JOIN sessions s CROSS JOIN flow_definitions f CROSS JOIN contract_drafts d CROSS JOIN manual_recordings m LIMIT 0")
 	return err
 }
 

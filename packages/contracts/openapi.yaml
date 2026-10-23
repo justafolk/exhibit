@@ -480,6 +480,105 @@ paths:
           description: Flow not found in this workspace
         '503':
           description: Preparation store unavailable
+  /api/v1/recordings:
+    get:
+      operationId: listRecordings
+      description: >-
+        Latest 100 workspace manual recording declarations, ordered by createdAt and id descending.
+        No media is stored or served.
+      responses:
+        '200':
+          description: Saved metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingList'
+        '400':
+          description: Invalid, oversized or forged metadata
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Recording or related run not found in this workspace
+        '503':
+          description: Metadata store unavailable
+    post:
+      operationId: createRecording
+      description: >-
+        Owner/editor only. Saves immutable declared metadata, not media bytes. A supplied SHA-256 is
+        unverified; the server fixes origin=manual, verification=unverified and mediaStored=false.
+        Related runs must belong to the same workspace. No run verdict is modified.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordingInput'
+      responses:
+        '201':
+          description: Saved manual declaration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recording'
+        '400':
+          description: Invalid, oversized or forged metadata
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Recording or related run not found in this workspace
+        '409':
+          description: Workspace has reached 100 recording metadata records
+        '503':
+          description: Metadata store unavailable
+  /api/v1/recordings/{id}:
+    get:
+      operationId: getRecording
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Manual metadata; media remains local
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recording'
+        '400':
+          description: Invalid, oversized or forged metadata
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Recording or related run not found in this workspace
+        '503':
+          description: Metadata store unavailable
+  /api/v1/activity:
+    get:
+      operationId: listActivity
+      description: >-
+        Latest 50 workspace flow, contract and recording authorship events. This is not an execution
+        or approval audit. No raw configuration contents are returned.
+      responses:
+        '200':
+          description: Recent preparation activity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityList'
+        '401':
+          description: Sign in required
+        '503':
+          description: Metadata store unavailable
 components:
   responses:
     Unavailable:
@@ -915,6 +1014,219 @@ components:
         testTenant:
           type: string
           maxLength: 100
+    RecordingChapter:
+      type: object
+      additionalProperties: false
+      required:
+        - label
+        - atSeconds
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 120
+        atSeconds:
+          type: number
+          minimum: 0
+          maximum: 3600
+          description: Must be within the recording duration
+    RecordingPresentation:
+      type: object
+      additionalProperties: false
+      required:
+        - frame
+        - zoom
+        - playbackRate
+      properties:
+        frame:
+          type: string
+          enum:
+            - paper
+            - mist
+            - slate
+        zoom:
+          type: number
+          minimum: 1
+          maximum: 2
+        playbackRate:
+          type: number
+          minimum: 0.5
+          maximum: 2
+    RecordingInput:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - fileName
+        - sha256
+        - bytes
+        - mediaType
+        - durationSeconds
+        - runId
+        - chapters
+        - presentation
+      description: >-
+        Manual media declaration. No bytes are uploaded. UTF-8 byte limits apply to strings; NUL is
+        rejected. All numeric values must be finite.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        fileName:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: A filename without path separators or control characters
+        sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Client-declared checksum; the server has no media bytes to verify it
+        bytes:
+          type: integer
+          minimum: 1
+          maximum: 134217728
+        mediaType:
+          type: string
+          enum:
+            - video/webm
+            - video/mp4
+        durationSeconds:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 3600
+        runId:
+          type: string
+          maxLength: 128
+          description: Related workspace run ID; empty means unattached
+        chapters:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/RecordingChapter'
+        presentation:
+          $ref: '#/components/schemas/RecordingPresentation'
+    Recording:
+      type: object
+      required:
+        - name
+        - fileName
+        - sha256
+        - bytes
+        - mediaType
+        - durationSeconds
+        - runId
+        - chapters
+        - presentation
+        - id
+        - origin
+        - verification
+        - mediaStored
+        - createdAt
+        - createdBy
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        fileName:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: A filename without path separators or control characters
+        sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Client-declared checksum; the server has no media bytes to verify it
+        bytes:
+          type: integer
+          minimum: 1
+          maximum: 134217728
+        mediaType:
+          type: string
+          enum:
+            - video/webm
+            - video/mp4
+        durationSeconds:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 3600
+        runId:
+          type: string
+          maxLength: 128
+          description: Related workspace run ID; empty means unattached
+        chapters:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/RecordingChapter'
+        presentation:
+          $ref: '#/components/schemas/RecordingPresentation'
+        id:
+          type: string
+        origin:
+          type: string
+          enum:
+            - manual
+        verification:
+          type: string
+          enum:
+            - unverified
+        mediaStored:
+          type: boolean
+          enum:
+            - false
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          description: Author user ID
+    RecordingList:
+      type: object
+      required:
+        - recordings
+      properties:
+        recordings:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/Recording'
+    Activity:
+      type: object
+      required:
+        - id
+        - action
+        - objectId
+        - actorId
+        - createdAt
+      properties:
+        id:
+          type: string
+        action:
+          type: string
+          enum:
+            - flow.created
+            - flow.updated
+            - contract.saved
+            - recording.created
+        objectId:
+          type: string
+        actorId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    ActivityList:
+      type: object
+      required:
+        - events
+      properties:
+        events:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/Activity'
   securitySchemes:
     sessionCookie:
       type: apiKey
