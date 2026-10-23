@@ -140,13 +140,31 @@ class EvidenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "test.webm").write_bytes(b"video bytes")
-            data = {"stats": {"startTime": "2026-01-01T10:00:00Z", "duration": 4000}, "errors": [], "suites": [{"specs": [{"title": "A real browser test", "tests": [{"projectName": "chromium", "status": "unexpected"}]}]}]}
+            data = {"config": {"metadata": {"exhibitCapture": {"schemaVersion": 1, "headSha": "a" * 40, "dirty": False}}}, "stats": {"startTime": "2026-01-01T10:00:00Z", "duration": 4000}, "errors": [], "suites": [{"specs": [{"title": "A real browser test", "tests": [{"projectName": "chromium", "status": "unexpected"}]}]}]}
             manifest = capture(data, root, "acme/exhibit", "a" * 40, "self-test-1", 1)
             self.assertEqual(outcome(manifest), "Failed")
             self.assertIsNone(manifest["pullRequest"])
             self.assertEqual(manifest["artifacts"][0]["sha256"], hashlib.sha256(b"video bytes").hexdigest())
             self.assertEqual(manifest["finishedAt"], "2026-01-01T10:00:04.000Z")
             self.assertTrue(manifest["sample"])
+
+    def test_capture_rejects_stale_missing_or_dirty_startup_provenance(self):
+        valid = {"schemaVersion": 1, "headSha": "a" * 40, "dirty": False}
+        invalid = [None, {}, {**valid, "headSha": "b" * 40},
+                   {**valid, "dirty": True}, {**valid, "dirty": "false"},
+                   {**valid, "dirty": 0}, {**valid, "schemaVersion": True}]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for provenance in invalid:
+                with self.subTest(provenance=provenance):
+                    data = {"config": {"metadata": {"exhibitCapture": provenance}},
+                            "stats": {"startTime": "2026-01-01T10:00:00Z", "duration": 1000},
+                            "suites": [], "errors": []}
+                    with self.assertRaises(InvalidEvidence):
+                        capture(data, root, "acme/exhibit", "a" * 40, "self-test-1", 1)
+            for data in ({}, {"config": {}}, {"config": {"metadata": {}}}):
+                with self.assertRaises(InvalidEvidence):
+                    capture(data, root, "acme/exhibit", "a" * 40, "self-test-1", 1)
 
 
 if __name__ == "__main__":
