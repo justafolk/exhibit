@@ -40,6 +40,7 @@ func (s Server) Handler() http.Handler {
 	}
 	mux := http.NewServeMux()
 	s.registerIdentity(mux)
+	s.registerPreparation(mux)
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, map[string]string{"status": "ok"}) })
 	mux.HandleFunc("GET /api/readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
@@ -101,6 +102,10 @@ func (s Server) Handler() http.Handler {
 		}
 		if err := decoder.Decode(&struct{}{}); err != io.EOF {
 			failure(w, 400, "expected one JSON object")
+			return
+		}
+		if err := evidence.ValidateDraft(*contract); err != nil {
+			failure(w, 400, err.Error())
 			return
 		}
 		respond(w, 200, evidence.Evaluate(*contract))

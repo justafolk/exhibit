@@ -22,8 +22,8 @@ func runFilter(w http.ResponseWriter, r *http.Request) (store.RunFilter, bool) {
 		}
 	}
 	filter := store.RunFilter{Query: strings.TrimSpace(query.Get("q")), Status: query.Get("status")}
-	if len(query.Get("q")) > 200 || !utf8.ValidString(filter.Query) {
-		failure(w, 400, "search must be valid UTF-8 and at most 200 bytes")
+	if len(query.Get("q")) > 200 || !utf8.ValidString(filter.Query) || strings.ContainsRune(filter.Query, 0) {
+		failure(w, 400, "search must be valid UTF-8 without NUL and at most 200 bytes")
 		return store.RunFilter{}, false
 	}
 	switch filter.Status {

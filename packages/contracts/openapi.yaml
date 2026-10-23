@@ -314,6 +314,172 @@ paths:
           description: Permission or CSRF check failed
         '503':
           description: Store unavailable
+  /api/v1/flows:
+    get:
+      operationId: listFlows
+      description: >-
+        At most 100 authored flow definitions in this workspace, sorted by updatedAt then id
+        descending. Definitions are unapproved metadata, never execution authority.
+      responses:
+        '200':
+          description: Workspace flow catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlowList'
+        '400':
+          description: Invalid or oversized input
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Flow not found in this workspace
+        '503':
+          description: Preparation store unavailable
+    post:
+      operationId: createFlow
+      description: Owner/editor only; records actor and time. At most 100 definitions per workspace.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlowInput'
+      responses:
+        '201':
+          description: Saved authored flow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flow'
+        '400':
+          description: Invalid or oversized input
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Flow not found in this workspace
+        '409':
+          description: Workspace flow capacity reached
+        '503':
+          description: Preparation store unavailable
+  /api/v1/flows/{id}:
+    get:
+      operationId: getFlow
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Authored flow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flow'
+        '400':
+          description: Invalid or oversized input
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Flow not found in this workspace
+        '503':
+          description: Preparation store unavailable
+    patch:
+      operationId: updateFlow
+      description: >-
+        Owner/editor only. Supplied fields replace their current values; omitted fields remain
+        unchanged. No approval or verdict is set.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlowPatch'
+      responses:
+        '200':
+          description: Updated authored flow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flow'
+        '400':
+          description: Invalid or oversized input
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Flow not found in this workspace
+        '503':
+          description: Preparation store unavailable
+  /api/v1/contract-draft:
+    get:
+      operationId: getContractDraft
+      description: Workspace draft. An unsaved draft has blank strings, pullRequest 0, and empty flowIds.
+      responses:
+        '200':
+          description: Saved or empty draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractDraft'
+        '400':
+          description: Invalid or oversized input
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Flow not found in this workspace
+        '503':
+          description: Preparation store unavailable
+    put:
+      operationId: saveContractDraft
+      description: >-
+        Owner/editor only. Replaces the shared workspace draft; omitted fields become empty. Bounded
+        incomplete/invalid values can be saved for later evaluation. Actor and time are recorded;
+        this never authorizes execution.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvidenceContract'
+      responses:
+        '200':
+          description: Saved draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractDraft'
+        '400':
+          description: Invalid or oversized input
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Flow not found in this workspace
+        '503':
+          description: Preparation store unavailable
 components:
   responses:
     Unavailable:
@@ -322,38 +488,44 @@ components:
     EvidenceContract:
       type: object
       additionalProperties: false
-      description: Fields are optional so the evaluator can report missing information.
+      description: >-
+        Optional bounded fields for completeness evaluation or draft saving. Semantic-invalid values
+        remain editable; all string limits are UTF-8 bytes and NUL is rejected. Supplied flow IDs
+        are not resolved or approved by this evaluator.
       properties:
         repository:
           type: string
-          example: acme/storefront
+          maxLength: 201
+          description: Expected owner/repository; invalid bounded values report needs_info
         pullRequest:
           type: integer
-          minimum: 1
+          minimum: 0
+          maximum: 2147483647
+          description: 0 is incomplete
         headSha:
           type: string
-          pattern: ^[a-f0-9]{40}$
+          maxLength: 100
+          description: Expected full lowercase 40-character SHA
         changeKind:
           type: string
-          enum:
-            - frontend
-            - backend
-            - fullstack
-            - docs
-            - migration
+          maxLength: 32
+          description: frontend, backend, fullstack, docs or migration
         environment:
           type: string
-          enum:
-            - staging
+          maxLength: 32
+          description: Only staging is eligible; other nonempty values evaluate not_testable
         flowIds:
           type: array
+          maxItems: 20
           items:
             type: string
-          minItems: 1
+            maxLength: 128
         runbookRef:
           type: string
+          maxLength: 512
         testTenant:
           type: string
+          maxLength: 100
     Evaluation:
       type: object
       required:
@@ -551,6 +723,198 @@ components:
           type: string
           maxLength: 512
           description: path@full-lowercase-40-character-commit-SHA, or empty
+    FlowInput:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - description
+        - preconditions
+        - assertions
+        - cleanup
+        - runbookRef
+      description: Authored metadata only. All string limits are UTF-8 byte limits; NUL is rejected.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 2000
+        preconditions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        assertions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        cleanup:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        runbookRef:
+          type: string
+          minLength: 1
+          maxLength: 512
+          pattern: ^[^\s@]+@[0-9a-f]{40}$
+    FlowPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 2000
+        preconditions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        assertions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        cleanup:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        runbookRef:
+          type: string
+          minLength: 1
+          maxLength: 512
+          pattern: ^[^\s@]+@[0-9a-f]{40}$
+    Flow:
+      type: object
+      required:
+        - name
+        - description
+        - preconditions
+        - assertions
+        - cleanup
+        - runbookRef
+        - id
+        - updatedAt
+        - updatedBy
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 2000
+        preconditions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        assertions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        cleanup:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        runbookRef:
+          type: string
+          minLength: 1
+          maxLength: 512
+          pattern: ^[^\s@]+@[0-9a-f]{40}$
+        id:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        updatedBy:
+          type: string
+          description: Author user ID, not an approval
+    FlowList:
+      type: object
+      required:
+        - flows
+      properties:
+        flows:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/Flow'
+    ContractDraft:
+      type: object
+      additionalProperties: false
+      required:
+        - repository
+        - pullRequest
+        - headSha
+        - changeKind
+        - environment
+        - flowIds
+        - runbookRef
+        - testTenant
+      description: >-
+        Workspace-shared draft with empty defaults. Authorship is recorded separately; content does
+        not grant execution authority.
+      properties:
+        repository:
+          type: string
+          maxLength: 201
+          description: Expected owner/repository; invalid bounded values report needs_info
+        pullRequest:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+          description: 0 is incomplete
+        headSha:
+          type: string
+          maxLength: 100
+          description: Expected full lowercase 40-character SHA
+        changeKind:
+          type: string
+          maxLength: 32
+          description: frontend, backend, fullstack, docs or migration
+        environment:
+          type: string
+          maxLength: 32
+          description: Only staging is eligible; other nonempty values evaluate not_testable
+        flowIds:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 128
+        runbookRef:
+          type: string
+          maxLength: 512
+        testTenant:
+          type: string
+          maxLength: 100
   securitySchemes:
     sessionCookie:
       type: apiKey
