@@ -23,13 +23,21 @@ export interface WorkspaceClient {
 }
 
 export class APIError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
     super(message);
     this.name = 'APIError';
   }
 }
 let csrfToken = '';
-async function request<T>(path: string, method = 'GET', body?: unknown, allowAnonymous = false): Promise<T> {
+async function request<T>(
+  path: string,
+  method = 'GET',
+  body?: unknown,
+  allowAnonymous = false,
+): Promise<T> {
   const headers: Record<string, string> = {};
   if (method !== 'GET') {
     headers['Content-Type'] = 'application/json';
@@ -44,9 +52,10 @@ async function request<T>(path: string, method = 'GET', body?: unknown, allowAno
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = typeof payload?.error === 'string'
-      ? payload.error
-      : `The service returned ${response.status}. Please try again.`;
+    const message =
+      typeof payload?.error === 'string'
+        ? payload.error
+        : `The service returned ${response.status}. Please try again.`;
     if (response.status === 401 && !allowAnonymous) {
       csrfToken = '';
       window.dispatchEvent(new Event('exhibit:session-expired'));
@@ -64,7 +73,9 @@ function remember(session: Session) {
 export const apiClient: WorkspaceClient = {
   async session() {
     try {
-      return remember(await request<Session>('/auth/session', 'GET', undefined, true));
+      return remember(
+        await request<Session>('/auth/session', 'GET', undefined, true),
+      );
     } catch (error) {
       if (error instanceof APIError && error.status === 401) {
         csrfToken = '';
@@ -74,7 +85,9 @@ export const apiClient: WorkspaceClient = {
     }
   },
   async login(email, password) {
-    return remember(await request<Session>('/auth/login', 'POST', { email, password }, true));
+    return remember(
+      await request<Session>('/auth/login', 'POST', { email, password }, true),
+    );
   },
   async demo() {
     return remember(await request<Session>('/auth/demo', 'POST', {}, true));

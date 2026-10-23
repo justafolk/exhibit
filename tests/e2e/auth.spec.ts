@@ -42,9 +42,9 @@ test('sample sessions are isolated, CSRF protected and revoked on logout', async
     runbookRef:
       'agents/runbooks/checkout.yaml@0123456789abcdef0123456789abcdef01234567',
   };
-  expect(
-    (await request.put('/api/v1/setup', { data: setup })).status(),
-  ).toBe(403);
+  expect((await request.put('/api/v1/setup', { data: setup })).status()).toBe(
+    403,
+  );
   expect(
     (
       await request.put('/api/v1/setup', {
@@ -64,7 +64,9 @@ test('sample sessions are isolated, CSRF protected and revoked on logout', async
       })
     ).ok(),
   ).toBe(true);
-  expect(await (await request.get('/api/v1/setup')).json()).toMatchObject(setup);
+  expect(await (await request.get('/api/v1/setup')).json()).toMatchObject(
+    setup,
+  );
 
   const other = await browser.newContext({ baseURL });
   try {

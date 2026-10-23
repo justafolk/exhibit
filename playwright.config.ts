@@ -22,6 +22,12 @@ export default defineConfig({
     url: `http://127.0.0.1:${webPort}`,
     reuseExistingServer: false,
     timeout: 120_000,
-    env: { WEB_PORT: webPort, API_PORT: apiPort, EXHIBIT_STORE: 'demo' },
+    env: {
+      WEB_PORT: webPort,
+      API_PORT: apiPort,
+      EXHIBIT_STORE: 'demo',
+      EXHIBIT_COOKIE_SECURE: 'false',
+      EXHIBIT_PUBLIC_ORIGIN: `http://127.0.0.1:${webPort}`,
+    },
   },
 });

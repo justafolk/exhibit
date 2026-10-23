@@ -5,6 +5,8 @@ env.API_PORT ??= '8080';
 env.WEB_PORT ??= '5173';
 env.API_ADDR = `127.0.0.1:${env.API_PORT}`;
 env.EXHIBIT_STORE ??= 'demo';
+// The browser's origin is the Vite port, even when the proxy rewrites Host.
+env.EXHIBIT_PUBLIC_ORIGIN ??= `http://127.0.0.1:${env.WEB_PORT}`;
 let stopping = false;
 const children = [];
 function stop(code = 0) {
