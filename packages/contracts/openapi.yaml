@@ -39,10 +39,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RunList'
+        '400':
+          description: Invalid, unknown, repeated or oversized filter
         '401':
           description: Sign in required
         '503':
           $ref: '#/components/responses/Unavailable'
+      description: >-
+        Returns up to 100 matching workspace runs ordered by createdAt descending, then id
+        descending. Filters apply before LIMIT. Unknown and repeated parameters are rejected.
+      parameters:
+        - in: query
+          name: q
+          description: >-
+            Literal case-insensitive substring of title, repository, PR number, run ID or full SHA;
+            whitespace trimmed, maximum 200 UTF-8 bytes.
+          schema:
+            type: string
+            maxLength: 200
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum:
+              - queued
+              - running
+              - verified
+              - partial
+              - failed
+              - couldnt_run
   /api/v1/runs/{id}:
     get:
       operationId: getRun

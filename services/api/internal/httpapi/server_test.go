@@ -57,7 +57,7 @@ func TestRoutes(t *testing.T) {
 type failingStore struct{ store.Demo }
 
 func (failingStore) Ping(context.Context) error { return errors.New("password=never-leak") }
-func (failingStore) List(context.Context) ([]store.Run, error) {
+func (failingStore) List(context.Context, store.RunFilter) ([]store.Run, error) {
 	return nil, errors.New("internal failure")
 }
 func TestUnavailableStore(t *testing.T) {

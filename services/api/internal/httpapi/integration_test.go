@@ -115,7 +115,7 @@ func TestPostgresLifecycle(t *testing.T) {
 	if rec := call(h, "GET", "/api/v1/runs/exh-1042", "", bravo, ""); rec.Code != 404 {
 		t.Fatal("another workspace read a run")
 	}
-	if _, err := data.List(ctx); err != store.ErrForbidden {
+	if _, err := data.List(ctx, store.RunFilter{}); err != store.ErrForbidden {
 		t.Fatal("unscoped query accepted")
 	}
 	if _, err := data.Get(store.WithWorkspace(ctx, "alpha"), "exh-1042"); err != nil {
@@ -123,6 +123,31 @@ func TestPostgresLifecycle(t *testing.T) {
 	}
 	if _, err := data.Get(store.WithWorkspace(ctx, "bravo"), "exh-1042"); err != store.ErrNotFound {
 		t.Fatal("store tenant predicate absent")
+	}
+
+	// More than 100 new rows must not hide an older matching result. Identical
+	// timestamps deliberately exercise the stable descending-ID tie breaker.
+	if _, err := pool.Exec(ctx, `INSERT INTO evidence_runs(id,repository,pull_request,title,head_sha,status,sample,environment,created_at,workspace_id)
+ SELECT 'bulk-'||lpad(n::text,3,'0'),'acme/filter',n,'Bulk matching row','0000000000000000000000000000000000000001','queued',true,'staging','2026-10-01T12:00:00Z','alpha' FROM generate_series(1,105) n`); err != nil {
+		t.Fatal(err)
+	}
+	filtered, err := data.List(store.WithWorkspace(ctx, "alpha"), store.RunFilter{Query: "BULK", Status: "queued"})
+	if err != nil || len(filtered) != 100 || filtered[0].ID != "bulk-105" || filtered[99].ID != "bulk-006" {
+		t.Fatalf("unstable filtered window: %d %v", len(filtered), err)
+	}
+	old, err := data.List(store.WithWorkspace(ctx, "alpha"), store.RunFilter{Query: "exh-1042"})
+	if err != nil || len(old) != 1 || old[0].ID != "exh-1042" {
+		t.Fatal("filters were applied after LIMIT")
+	}
+	empty, err := data.List(store.WithWorkspace(ctx, "bravo"), store.RunFilter{Query: "bulk", Status: "queued"})
+	if err != nil || len(empty) != 0 {
+		t.Fatal("filtered query crossed tenant boundary")
+	}
+	for _, query := range []string{"%", "_", "' OR true --"} {
+		rows, err := data.List(store.WithWorkspace(ctx, "alpha"), store.RunFilter{Query: query})
+		if err != nil || len(rows) != 0 {
+			t.Fatalf("nonliteral search %q", query)
+		}
 	}
 	setup := `{"repository":"acme/private","stagingUrl":"https://staging.example.com","testTenant":"alpha-test","runbookRef":"agents/runbook.yaml@0000000000000000000000000000000000000001"}`
 	if rec := call(h, "PUT", "/api/v1/setup", setup, alpha, session.CSRFToken); rec.Code != 200 {

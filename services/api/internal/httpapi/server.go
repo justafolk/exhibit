@@ -54,7 +54,11 @@ func (s Server) Handler() http.Handler {
 		respond(w, 200, map[string]string{"application": "exhibit", "version": "0.1.0", "commitSha": s.CommitSHA})
 	})
 	mux.HandleFunc("GET /api/v1/runs", func(w http.ResponseWriter, r *http.Request) {
-		runs, err := s.Store.List(r.Context())
+		filter, ok := runFilter(w, r)
+		if !ok {
+			return
+		}
+		runs, err := s.Store.List(r.Context(), filter)
 		if err != nil {
 			slog.Error("list runs failed", "error", err)
 			failure(w, 503, "evidence store unavailable")

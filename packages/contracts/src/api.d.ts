@@ -59,6 +59,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Returns up to 100 matching workspace runs ordered by createdAt descending, then id descending. Filters apply before LIMIT. Unknown and repeated parameters are rejected. */
         get: operations["listRuns"];
         put?: never;
         post?: never;
@@ -368,7 +369,11 @@ export interface operations {
     };
     listRuns: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Literal case-insensitive substring of title, repository, PR number, run ID or full SHA; whitespace trimmed, maximum 200 UTF-8 bytes. */
+                q?: string;
+                status?: "queued" | "running" | "verified" | "partial" | "failed" | "couldnt_run";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -383,6 +388,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RunList"];
                 };
+            };
+            /** @description Invalid, unknown, repeated or oversized filter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Sign in required */
             401: {
