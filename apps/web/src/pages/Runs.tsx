@@ -7,7 +7,7 @@ import { message } from '../navigation';
 const statuses = Object.keys(statusLabels) as Run['status'][];
 type Outcome = Run['status'] | 'attention' | '';
 const needsAttention = (run: Run) =>
-  ['partial', 'failed', 'couldnt_run'].includes(run.status);
+  ['partial', 'failed', 'couldnt_run', 'unverified'].includes(run.status);
 function initialFilters(): { q: string; status: Outcome } {
   const params = new URLSearchParams(window.location.hash.split('?')[1]);
   const status = params.get('status');

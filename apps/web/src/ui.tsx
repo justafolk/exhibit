@@ -77,6 +77,7 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
 }
 export const statusLabels: Record<Run['status'], string> = {
   verified: 'Verified',
+  unverified: 'Unverified',
   partial: 'Partial',
   failed: 'Failed',
   couldnt_run: 'Couldn’t run',

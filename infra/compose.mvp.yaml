@@ -13,11 +13,13 @@ services:
     environment:
       DATABASE_URL: postgres://exhibit:${POSTGRES_PASSWORD:?}@postgres:5432/exhibit?sslmode=disable
       EXHIBIT_STORE: postgres
+      EXHIBIT_ARTIFACT_DIR: /var/lib/exhibit/artifacts
       EXHIBIT_COOKIE_SECURE: 'true'
       EXHIBIT_PUBLIC_ORIGIN: ${EXHIBIT_PUBLIC_ORIGIN:?Set the HTTPS application origin}
     depends_on:
       postgres:
         condition: service_healthy
+    volumes: ['artifact_data:/var/lib/exhibit/artifacts']
     read_only: true
     cap_drop: [ALL]
     security_opt: ['no-new-privileges:true']
@@ -36,3 +38,4 @@ services:
       retries: 20
 volumes:
   postgres_data:
+  artifact_data:

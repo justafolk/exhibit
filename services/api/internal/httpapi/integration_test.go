@@ -308,6 +308,7 @@ func TestPostgresLifecycle(t *testing.T) {
 	if rec := call(h, "GET", "/api/v1/activity", "", bravo, ""); strings.Contains(rec.Body.String(), recording.ID) {
 		t.Fatal("recording authorship leaked")
 	}
+	testCIArchive(t, data, alpha, bravo, session)
 	if _, err := pool.Exec(ctx, `UPDATE workspace_memberships SET role='viewer' WHERE user_id='alpha'`); err != nil {
 		t.Fatal(err)
 	}

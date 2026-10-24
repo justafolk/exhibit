@@ -1,0 +1,36 @@
+name: Persist Action evidence
+description: Save a completed workflow's reports, original recordings and masked job logs to an Exhibit workspace
+inputs:
+  exhibit-url:
+    description: HTTPS Exhibit application origin, without a hash or path
+    required: true
+  ingestion-token:
+    description: Repository-scoped EXHIBIT_INGEST_TOKEN secret, created by the workspace owner
+    required: true
+  github-token:
+    description: Read-only Actions token for the producer repository
+    required: true
+  workflow-run-id:
+    description: Completed producer workflow ID; this action must run in a fresh trusted job
+    required: true
+  workflow-run-attempt:
+    description: Exact completed attempt number, including earlier reruns
+    required: true
+outputs:
+  report-url:
+    description: Private dashboard report URL
+    value: ${{ steps.save.outputs.report-url }}
+runs:
+  using: composite
+  steps:
+    - name: Persist original evidence and workflow outputs
+      id: save
+      shell: bash
+      env:
+        EXHIBIT_ACTION_PATH: ${{ github.action_path }}
+        EXHIBIT_INGEST_URL: ${{ inputs.exhibit-url }}
+        EXHIBIT_INGEST_TOKEN: ${{ inputs.ingestion-token }}
+        GH_TOKEN: ${{ inputs.github-token }}
+        SOURCE_RUN_ID: ${{ inputs.workflow-run-id }}
+        SOURCE_RUN_ATTEMPT: ${{ inputs.workflow-run-attempt }}
+      run: python3 "$EXHIBIT_ACTION_PATH/../../../scripts/persist_action_evidence.py"

@@ -27,7 +27,7 @@ func runFilter(w http.ResponseWriter, r *http.Request) (store.RunFilter, bool) {
 		return store.RunFilter{}, false
 	}
 	switch filter.Status {
-	case "", "queued", "running", "verified", "partial", "failed", "couldnt_run":
+	case "", "queued", "running", "verified", "partial", "failed", "couldnt_run", "unverified":
 	default:
 		failure(w, 400, "unknown run status")
 		return store.RunFilter{}, false

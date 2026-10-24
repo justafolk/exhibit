@@ -19,6 +19,7 @@ var ErrNotFound = errors.New("run not found")
 type Assertion struct {
 	Label  string `json:"label"`
 	Passed bool   `json:"passed"`
+	Status string `json:"status,omitempty"`
 }
 type Run struct {
 	ID              string      `json:"id"`
@@ -34,6 +35,7 @@ type Run struct {
 	Flows           []string    `json:"flows"`
 	Assertions      []Assertion `json:"assertions"`
 	NotCovered      []string    `json:"notCovered"`
+	CI              *CIInfo     `json:"ci,omitempty"`
 }
 type RunFilter struct {
 	Query  string
@@ -95,7 +97,7 @@ func (p Postgres) Ping(ctx context.Context) error {
 		return err
 	}
 	// Ready means migrations exist too, not merely an open TCP socket.
-	_, err := p.Pool.Exec(ctx, "SELECT r.workspace_id, s.token_hash, f.id, d.workspace_id FROM evidence_runs r CROSS JOIN sessions s CROSS JOIN flow_definitions f CROSS JOIN contract_drafts d CROSS JOIN manual_recordings m LIMIT 0")
+	_, err := p.Pool.Exec(ctx, "SELECT r.workspace_id, s.token_hash, f.id, d.workspace_id FROM evidence_runs r CROSS JOIN sessions s CROSS JOIN flow_definitions f CROSS JOIN contract_drafts d CROSS JOIN manual_recordings m CROSS JOIN ci_submissions c CROSS JOIN ci_files a CROSS JOIN ingestion_tokens t LIMIT 0")
 	return err
 }
 
@@ -103,7 +105,7 @@ const columns = `id, repository, pull_request, title, head_sha, status, sample, 
 
 func scan(row pgx.Row) (Run, error) {
 	var r Run
-	err := row.Scan(&r.ID, &r.Repository, &r.PullRequest, &r.Title, &r.HeadSHA, &r.Status, &r.Sample, &r.Environment, &r.CreatedAt, &r.DurationSeconds, &r.Flows, &r.Assertions, &r.NotCovered)
+	err := row.Scan(&r.ID, &r.Repository, &r.PullRequest, &r.Title, &r.HeadSHA, &r.Status, &r.Sample, &r.Environment, &r.CreatedAt, &r.DurationSeconds, &r.Flows, &r.Assertions, &r.NotCovered, &r.CI)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return r, ErrNotFound
 	}
@@ -113,7 +115,7 @@ func (p Postgres) List(ctx context.Context, filter RunFilter) ([]Run, error) {
 	if WorkspaceID(ctx) == "" {
 		return nil, ErrForbidden
 	}
-	rows, err := p.Pool.Query(ctx, "SELECT "+columns+` FROM evidence_runs WHERE workspace_id=$1 AND ($2='' OR status=$2) AND ($3='' OR strpos(lower(title || ' ' || repository || ' ' || pull_request::text || ' ' || id || ' ' || head_sha),lower($3))>0) ORDER BY created_at DESC, id DESC LIMIT 100`, WorkspaceID(ctx), filter.Status, filter.Query)
+	rows, err := p.Pool.Query(ctx, "SELECT "+columns+", ci"+` FROM evidence_runs WHERE workspace_id=$1 AND ($2='' OR status=$2) AND ($3='' OR strpos(lower(title || ' ' || repository || ' ' || pull_request::text || ' ' || id || ' ' || head_sha),lower($3))>0) ORDER BY created_at DESC, id DESC LIMIT 100`, WorkspaceID(ctx), filter.Status, filter.Query)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +134,7 @@ func (p Postgres) Get(ctx context.Context, id string) (Run, error) {
 	if WorkspaceID(ctx) == "" {
 		return Run{}, ErrForbidden
 	}
-	return scan(p.Pool.QueryRow(ctx, "SELECT "+columns+" FROM evidence_runs WHERE id=$1 AND workspace_id=$2", id, WorkspaceID(ctx)))
+	return scan(p.Pool.QueryRow(ctx, "SELECT "+columns+", ci"+" FROM evidence_runs WHERE id=$1 AND workspace_id=$2", id, WorkspaceID(ctx)))
 }
 
 // SeedSamples only inserts explicit demo records. Callers enforce a local DB guard.

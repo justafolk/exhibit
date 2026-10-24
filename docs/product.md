@@ -24,7 +24,7 @@ Agents produce evidence; humans review it. The primary experience is a review qu
 agent recordings, one agent handoff, and settings. Form-based staging setup, flow
 definitions and contract inspection are advanced operator tools, not the default journey.
 `npm run evidence:record` now automates capture and local evidence collection for this
-repository’s sample browser suite. Hosted customer execution and ingestion remain pending.
+repository’s sample browser suite. Hosted customer execution remains pending; completed CI workflows can upload private evidence.
 See [the experience research and priorities](agent-experience.md).
 
 The light-mode workspace provides private account sign-in, server-enforced workspace
@@ -58,8 +58,10 @@ A model narrative cannot set a successful verdict. Failed boot, skipped coverage
 all attempts must be visible.
 
 The sample Actions integration captures and hashes frontend/API artifacts, and the
-review workspace serves a curated playable snapshot. Authenticated live ingestion and
-private artifact delivery for arbitrary customer runs remain unimplemented.
+review workspace serves saved CI recordings and reports through workspace-authorized reads.
+Repository-scoped ingestion tokens connect completed same-repository workflows; see
+[action evidence storage](action-evidence-storage.md). The bundled snapshot remains a
+separate demo experience.
 
 ## Demonstrated sample integration
 
@@ -69,7 +71,8 @@ hashes artifacts and runs isolated Codex CLI advice. It posts account-verified s
 and completion comments, with animated previews and links to the full videos and
 HTML/Markdown/JSON report. It is limited to same-repository, non-draft sample PRs;
 the code rejects stale head/attempt data and does not promote advice to a verified verdict.
-This is separate from the future GitHub App/orchestrator and hosted workspace ingestion.
+Completed workflow outputs can now be ingested into a persistent workspace. This is
+separate from the future GitHub App/orchestrator and hosted test execution.
 
 See [the hackathon review guide](hackathon.md) for source paths, an observed successful
 run and the distinction between the bundled dashboard snapshot and newer CI evidence.

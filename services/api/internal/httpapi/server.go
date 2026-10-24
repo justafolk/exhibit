@@ -24,6 +24,7 @@ type Server struct {
 	Identity      store.IdentityStore
 	SecureCookies bool
 	PublicOrigin  string
+	ArtifactDir   string
 }
 
 func respond(w http.ResponseWriter, status int, body any) {
@@ -42,6 +43,7 @@ func (s Server) Handler() http.Handler {
 	s.registerIdentity(mux)
 	s.registerPreparation(mux)
 	s.registerRecordings(mux)
+	s.registerCI(mux)
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, map[string]string{"status": "ok"}) })
 	mux.HandleFunc("GET /api/readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
@@ -138,7 +140,11 @@ func (s Server) Handler() http.Handler {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			w.Header().Set("Cache-Control", "no-store")
 		}
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		timeout := 10 * time.Second
+		if strings.HasPrefix(r.URL.Path, "/api/ingest/") || strings.Contains(r.URL.Path, "/files/") {
+			timeout = 2 * time.Minute
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), timeout)
 		defer cancel()
 		protected.ServeHTTP(w, r.WithContext(ctx))
 	})
