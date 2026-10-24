@@ -76,11 +76,10 @@ def main():
     validate_targets(service, database)
     disk = disk_for_service()
     print('Validated existing service/database. Current plan: ' + service['serviceDetails']['plan'], flush=True)
+    if service['serviceDetails']['plan'] == 'free':
+        raise SetupError('Switch exhibit-sample from Free to Starter in the Render dashboard first; Render API cannot change between free and paid plans. No deployment changes were made.')
     migrate(database)
     changes = {'branch': 'main', 'autoDeployTrigger': 'off'}
-    if service['serviceDetails']['plan'] == 'free':
-        changes['serviceDetails'] = {'plan': 'starter'}
-        print('Applying the merged Starter plan required for a persistent disk.', flush=True)
     render('services/' + SERVICE, 'PATCH', changes)
     if not disk:
         disk = render('disks', 'POST', {'name': 'exhibit-artifacts', 'serviceId': SERVICE,

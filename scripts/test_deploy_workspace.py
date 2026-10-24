@@ -27,6 +27,13 @@ class DeploymentTests(unittest.TestCase):
         changed=copy.deepcopy(disk);changed['disk']['mountPath']='/other-data'
         with patch.object(deploy,'render',return_value=[changed]),self.assertRaises(SetupError):deploy.disk_for_service()
 
+    def test_free_plan_fails_before_database_or_service_mutation(self):
+        service={'serviceDetails':{'plan':'free'}}
+        with patch.dict(os.environ,{'RENDER_API_KEY':'synthetic','GITHUB_SHA':'a'*40}),patch.object(deploy.subprocess,'check_output',return_value='a'*40),patch.object(deploy,'render',side_effect=[service,{}]) as api,patch.object(deploy,'validate_targets'),patch.object(deploy,'disk_for_service',return_value=None),patch.object(deploy,'migrate') as migrate:
+            with self.assertRaisesRegex(SetupError,'Render dashboard first'):deploy.main()
+        migrate.assert_not_called()
+        self.assertTrue(all(len(call.args)==1 for call in api.call_args_list))
+
     def test_deploy_preserves_account_and_database_settings_and_pins_commit(self):
         commit='a'*40;mutations=[]
         service={'ownerId':deploy.validate_targets.__globals__['WORKSPACE'],'repo':'https://github.com/justafolk/exhibit','serviceDetails':{'region':'oregon','plan':'starter'}}
