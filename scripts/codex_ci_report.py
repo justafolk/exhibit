@@ -28,11 +28,14 @@ def build(status, *, evidence=None, review=None, failure=None, started_at=None):
         raise ValueError('Unsupported Codex report status')
     source = None
     if evidence is not None:
-        counts = {state: sum(a['status'] == state for a in evidence['assertions'])
-                  for state in ('passed', 'failed', 'skipped')}
-        source = {'termination': evidence['termination'], 'browserAssertions': counts,
+        def counts(api):
+            return {state: sum(a['status'] == state and a.get('id','').startswith('api-') == api for a in evidence['assertions'])
+                    for state in ('passed', 'failed', 'skipped')}
+        has_api = any(a.get('id','').startswith('api-') for a in evidence['assertions'])
+        source = {'termination': evidence['termination'], 'browserAssertions': counts(False), 'apiAssertions': counts(True) if has_api else None,
                   'recordings': sum(a['mediaType'].startswith('video/') for a in evidence['artifacts']),
-                  'artifacts': len(evidence['artifacts']), 'coverageGaps': evidence['notCovered']}
+                  'artifacts': len(evidence['artifacts']), 'coverageGaps': evidence['notCovered'],
+                  'testResults': [{'id':a.get('id',''), 'label':a.get('label','Unnamed test'), 'status':a['status']} for a in evidence['assertions']]}
     data = {'schemaVersion': 1, **metadata(), 'status': status, 'advisory': True,
             'verification': 'unverified', 'cliVersion': '0.164.0',
             'startedAt': started_at, 'finishedAt': now(), 'evidenceValidated': evidence is not None,
@@ -40,7 +43,7 @@ def build(status, *, evidence=None, review=None, failure=None, started_at=None):
             'failure': failure if status == 'failed' else None,
             'limitations': ['Agent advice cannot change deterministic test results or verification.',
                             'Codex reviewed test assertions and recording metadata, not video contents.',
-                            'API test status remains in the separate evidence job; counts here are browser assertions only.']}
+                            'API test counts are shown only when backend results were captured and validated.']}
     run_id = data['workflowRunId']
     data['runUrl'] = f"https://github.com/{data['repository']}/actions/runs/{run_id}" if run_id else None
     return data
@@ -59,6 +62,11 @@ def markdown(data):
         lines += ['### Deterministic browser evidence', '',
                   f"Passed: {counts['passed']} · Failed: {counts['failed']} · Skipped: {counts['skipped']}",
                   f"Recordings: {source['recordings']} · Hashed artifacts: {source['artifacts']}", '']
+        api = source.get('apiAssertions')
+        lines += ['### Backend API evidence', '',
+                  f"Passed: {api['passed']} · Failed: {api['failed']} · Skipped: {api['skipped']}" if api is not None else 'API results were not included in this capture.', '']
+        from evidence_tool import markdown as escape_markdown
+        lines += ["### Individual tests", ""] + [f"- {a['status'].upper()}: {escape_markdown(a['label'])}" for a in source['testResults']] + ['']
     if data['status'] == 'not_configured':
         lines += ['No agent was run. Configure the `CODEX_AUTH_JSON` GitHub secret to enable CLI review.', '']
     if data['failure']:
@@ -80,18 +88,20 @@ def html_report(data):
             ('Evidence validated', data['evidenceValidated']), ('Started', data['startedAt'] or 'Not observed'), ('Finished', data['finishedAt'])]
     if source:
         rows += [('Browser assertions', ', '.join(f'{value} {key}' for key, value in source['browserAssertions'].items())),
+                 ('Backend API assertions', ', '.join(f'{value} {key}' for key,value in source['apiAssertions'].items()) if source.get('apiAssertions') is not None else 'Not captured'),
                  ('Original recordings', source['recordings']), ('Hashed artifacts', source['artifacts'])]
     if data['failure']:
         rows += [('Failure stage', data['failure']['stage']), ('Failure category', data['failure']['category'])]
     advice = data['review'] or ('No agent was run. Configure CODEX_AUTH_JSON in GitHub Actions secrets.' if data['status'] == 'not_configured' else 'No completed agent review is available.')
     gaps = source['coverageGaps'] if source else ['Source evidence was not validated; no test success is claimed.']
+    tests = ('<h2>Individual frontend and backend tests</h2><table>' + ''.join(f"<tr><th>{esc(a['label'])}</th><td>{esc(a['status'])}</td></tr>" for a in source.get('testResults',[])) + '</table>') if source else ''
     link = f'<p><a href="{esc(data["runUrl"])}">Open workflow and original recordings</a></p>' if data['runUrl'] else ''
     return ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>Codex CI report</title><style>body{font:16px system-ui;color:#20332b;background:#f5f6f1;max-width:900px;margin:40px auto;padding:24px}'
             'table{width:100%;border-collapse:collapse;background:white}th,td{text-align:left;padding:12px;border-bottom:1px solid #ddd;overflow-wrap:anywhere}'
             'pre{white-space:pre-wrap;background:white;padding:24px;border:1px solid #ddd}h1{font:40px Georgia}</style><main><h1>Codex CI report</h1>'
             '<p>Advisory review · Unverified evidence</p><table>' + ''.join(f'<tr><th>{esc(k)}</th><td>{esc(v)}</td></tr>' for k,v in rows) + '</table>'
-            + link + '<h2>Codex suggestions</h2><pre>' + esc(advice) + '</pre><h2>Coverage gaps</h2><ul>'
+            + link + tests + '<h2>Codex suggestions</h2><pre>' + esc(advice) + '</pre><h2>Coverage gaps</h2><ul>'
             + ''.join('<li>' + esc(gap) + '</li>' for gap in gaps) + '</ul><h2>Limits</h2><ul>'
             + ''.join('<li>' + esc(value) + '</li>' for value in data['limitations']) + '</ul></main></html>\n')
 

@@ -8,7 +8,8 @@ import subprocess
 import sys
 
 from evidence_capture import capture
-from evidence_tool import InvalidEvidence, SHA, read_json, report, require
+from api_evidence import collect_api
+from evidence_tool import InvalidEvidence, SHA, read_json, report, require, validate_manifest, verify_artifacts, timestamp
 
 ACTIONS = {"opened", "reopened", "synchronize", "labeled", "ready_for_review"}
 
@@ -75,6 +76,18 @@ def main():
         manifest = collect(event, read_json(Path(os.environ["PLAYWRIGHT_JSON"])),
                            Path(os.environ["ARTIFACT_ROOT"]),
                            f"sample-pr-{os.environ['GITHUB_RUN_ID']}", int(os.environ["GITHUB_RUN_ATTEMPT"]))
+        if os.environ.get("REQUIRE_API", "false") == "true":
+            api_assertions, api_artifacts, api_provenance = collect_api(
+                os.environ["API_JUNIT"], os.environ["API_CAPTURE"], manifest["headSha"], Path(os.environ["ARTIFACT_ROOT"]))
+            manifest["assertions"].extend(api_assertions)
+            manifest["artifacts"].extend(api_artifacts)
+            manifest["startedAt"] = min((manifest["startedAt"], api_provenance["startedAt"]), key=lambda value: timestamp(value, "start time"))
+            manifest["finishedAt"] = max((manifest["finishedAt"], api_provenance["finishedAt"]), key=lambda value: timestamp(value, "finish time"))
+            if any(a["status"] == "failed" for a in api_assertions):
+                manifest["termination"] = "failed"
+            manifest["notCovered"][0] = "Secret-free sample frontend browser and backend API tests only; no deployed staging or production was exercised"
+            validate_manifest(manifest, manifest["headSha"])
+            verify_artifacts(manifest, Path(os.environ["ARTIFACT_ROOT"]))
         output = Path(os.environ["MANIFEST_PATH"])
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(manifest, indent=2) + "\n")
