@@ -16,6 +16,22 @@ var ErrFileIntegrity = errors.New("file length or SHA-256 mismatch")
 // as an object key. Metadata becomes visible only after hash-checked atomic rename.
 type DiskBlobs struct{ Root string }
 
+// Ping checks the configured volume using a private temporary file, removed immediately.
+func (b DiskBlobs) Ping() error {
+	if err := os.MkdirAll(b.Root, 0700); err != nil {
+		return err
+	}
+	f, err := os.CreateTemp(b.Root, ".ready-")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+	if _, err = f.Write([]byte("ready")); err != nil {
+		return err
+	}
+	return f.Sync()
+}
 func (b DiskBlobs) filename(key string) (string, error) {
 	parts := strings.Split(key, "/")
 	if len(parts) != 2 {

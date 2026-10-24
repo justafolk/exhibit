@@ -52,6 +52,12 @@ func (s Server) Handler() http.Handler {
 			failure(w, 503, "store unavailable or migrations pending")
 			return
 		}
+		if s.Store.Mode() == "postgres" && s.ArtifactDir != "" {
+			if err := (store.DiskBlobs{Root: s.ArtifactDir}).Ping(); err != nil {
+				failure(w, 503, "private artifact storage unavailable")
+				return
+			}
+		}
 		respond(w, 200, map[string]string{"status": "ready", "mode": s.Store.Mode()})
 	})
 	mux.HandleFunc("GET /api/version", func(w http.ResponseWriter, r *http.Request) {
