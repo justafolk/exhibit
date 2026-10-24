@@ -1,0 +1,46 @@
+name: Provision Exhibit workspace
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: Owner login email
+        required: true
+      name:
+        description: Owner display name
+        required: true
+      workspace:
+        description: Workspace display name
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: provision-exhibit-workspace
+  cancel-in-progress: false
+jobs:
+  provision:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      EXHIBIT_OWNER_EMAIL: ${{ inputs.email }}
+      EXHIBIT_OWNER_NAME: ${{ inputs.name }}
+      EXHIBIT_WORKSPACE_NAME: ${{ inputs.workspace }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Provision owner, deploy database mode and save sample configuration
+        run: python3 scripts/provision_workspace.py
+      - name: Retain encrypted owner credential
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: encrypted-owner-credential
+          path: .local/operator-credentials/owner-password.enc
+          retention-days: 1
+          if-no-files-found: ignore
