@@ -1,3 +1,4 @@
+import { displayLabel } from '../labels';
 import { useEffect, useRef, useState } from 'react';
 import type {
   Recording,
@@ -329,8 +330,7 @@ export function Studio({
                     <option value="">No association</option>
                     {runs.runs.map((run) => (
                       <option key={run.id} value={run.id}>
-                        #{run.pullRequest} · {run.title}
-                        {run.sample ? ' (sample)' : ''}
+                        #{run.pullRequest} · {displayLabel(run.title)}
                       </option>
                     ))}
                   </select>

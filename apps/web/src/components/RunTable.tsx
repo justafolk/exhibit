@@ -1,3 +1,4 @@
+import { displayLabel } from '../labels';
 import type { Run } from '../client';
 import { Badge, duration, Icon } from '../ui';
 
@@ -13,6 +14,12 @@ export function RunTable({
   return (
     <div className="table-scroll">
       <table>
+        {runs.some((run) => run.sample) && (
+          <caption className="table-context">
+            Includes illustrative review records. Status examples do not certify
+            execution; open a report for context.
+          </caption>
+        )}
         <thead>
           <tr>
             <th>Pull request</th>
@@ -32,13 +39,12 @@ export function RunTable({
                   className="run-title"
                   href={`#/runs/${encodeURIComponent(run.id)}${reportQuery}`}
                 >
-                  {run.title}
+                  {displayLabel(run.title)}
                 </a>
                 <div className="run-meta">
                   <Icon name="branch" size={13} />
                   <span>{run.repository}</span>
                   <span>#{run.pullRequest}</span>
-                  {run.sample && <span className="sample-tag">Sample</span>}
                 </div>
               </td>
               <td>

@@ -94,13 +94,13 @@ export function SignIn({
             }}
           >
             {pending === 'demo'
-              ? 'Opening sample…'
-              : 'Explore sample workspace'}
+              ? 'Opening preview…'
+              : 'Explore workspace preview'}
             <Icon name="arrow" size={17} />
           </button>
           <p className="auth-help">
-            Sample data only. No repositories are connected and no pull requests
-            are executed.
+            Illustrative data only. No repositories are connected and no pull
+            requests are executed.
           </p>
         </div>
         <p className="auth-provision">

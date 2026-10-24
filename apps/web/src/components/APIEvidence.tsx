@@ -17,13 +17,17 @@ export function APIEvidence() {
   return (
     <section className="api-evidence" aria-label="API evidence">
       <div className="panel api-capture-summary">
-        <span className="eyebrow">SUPPLEMENTAL LOCAL CAPTURE · SAMPLE</span>
+        <span className="eyebrow">SUPPLEMENTAL LOCAL CAPTURE</span>
         <h2>Requests, responses, and the checks behind them.</h2>
         <p>
           11 actual cURL requests cover checkout, error responses, persistence,
           and cleanup. Expected 400, 402, and 409 responses passed their checks.
         </p>
-        <p>{apiEvidence.scopeNote}</p>
+        <p>
+          These checkout requests were captured locally against the linked
+          source commit. The source PR changed workflow configuration, not API
+          code; this supplement is separate from the CI artifact.
+        </p>
         <small>
           Captured {apiEvidence.startedAt} · source{' '}
           {apiEvidence.headSha.slice(0, 7)} · provenance unverified
@@ -76,7 +80,7 @@ export function APIEvidence() {
           </ul>
           <h3>Request</h3>
           <p>
-            These commands target the captured local sample server. Start that
+            These commands target the captured local fixture server. Start that
             source commit locally before replaying, and run the setup request
             first.
           </p>

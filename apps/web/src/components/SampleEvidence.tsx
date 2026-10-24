@@ -19,10 +19,7 @@ const bytes = (n: number) => `${(n / 1024).toFixed(1)} KiB`;
 
 export function FeaturedEvidence() {
   return (
-    <section
-      className="panel featured-evidence"
-      aria-label="Recorded sample evidence"
-    >
+    <section className="panel featured-evidence" aria-label="Recorded evidence">
       <a className="featured-preview" href="#/evidence/sample-project">
         <img
           src={sampleAsset(scenarios[0].poster)}
@@ -34,11 +31,11 @@ export function FeaturedEvidence() {
         </span>
       </a>
       <div>
-        <span className="eyebrow">REAL CI CAPTURE · SAMPLE PROJECT</span>
+        <span className="eyebrow">GITHUB ACTIONS CAPTURE</span>
         <h2>See an agent's work, not just its summary.</h2>
         <p>
           Saved-address checkout, a declined payment, and an out-of-stock cart.
-          Three actual recordings from the sample project's GitHub Action.
+          Three actual recordings from the project's GitHub Action.
         </p>
         <div className="evidence-facts">
           <span>
@@ -55,7 +52,7 @@ export function FeaturedEvidence() {
           Explore the evidence <Icon name="arrow" size={14} />
         </a>
         <small>
-          Curated sample · provenance unverified · PR #1 ·{' '}
+          Curated capture · provenance unverified · PR #1 ·{' '}
           {fieldStore.headSha.slice(0, 7)}
         </small>
       </div>
@@ -65,10 +62,10 @@ export function FeaturedEvidence() {
 
 export function SampleGallery() {
   return (
-    <section className="sample-gallery" aria-label="Sample recording gallery">
+    <section className="sample-gallery" aria-label="Recording gallery">
       <div className="gallery-heading">
         <div>
-          <span className="eyebrow">FROM SAMPLE-PROJECT-EXHIBIT</span>
+          <span className="eyebrow">FIELD STORE · GITHUB ACTIONS</span>
           <h2>Three scenarios. Original footage.</h2>
           <p>
             Imported from one completed CI run. Each clip is a real browser
@@ -118,7 +115,7 @@ export function SampleGallery() {
         ))}
       </div>
       <p className="sample-caption">
-        Synthetic storefront data. These recordings are curated public samples,
+        Synthetic storefront data. These recordings are curated public captures,
         separate from your workspace's saved manifests.
       </p>
     </section>
@@ -171,7 +168,7 @@ export function SampleEvidence() {
       </a>
       <PageHeading
         title="Checkout evidence, ready to inspect"
-        description="Field Store · sample-project-exhibit · Pull request #1"
+        description="Field Store · Pull request #1"
         action={
           <a
             className="secondary"
@@ -187,7 +184,7 @@ export function SampleEvidence() {
         <span className="result-pass">
           <Icon name="check" size={14} />3 browser checks passed
         </span>
-        <span className="quiet-badge">Sample · provenance unverified</span>
+        <span className="quiet-badge">Provenance unverified</span>
         <span>
           Attempt {fieldStore.attempt} ·{' '}
           {(fieldStore.durationMs / 1000).toFixed(2)}s suite ·{' '}
@@ -487,7 +484,7 @@ export function SampleEvidence() {
           <section className="panel">
             <div className="panel-heading">
               <h2>Where this evidence came from</h2>
-              <span className="quiet-badge">Imported sample snapshot</span>
+              <span className="quiet-badge">Imported capture</span>
             </div>
             <dl className="sample-provenance">
               <div>
@@ -547,14 +544,14 @@ export function SampleEvidence() {
               </div>
               <div>
                 <dt>Verification</dt>
-                <dd>Self-reported sample · unverified</dd>
+                <dd>Self-reported capture · unverified</dd>
               </div>
             </dl>
           </section>
           <section className="panel evidence-gaps">
             <h2>Coverage and cleanup</h2>
             <p>
-              Executed against the local sample server on its GitHub runner. No
+              Executed against the local fixture server on its GitHub runner. No
               staging deployment, production payment, or customer account was
               exercised.
             </p>
@@ -573,16 +570,16 @@ export function SampleEvidence() {
                 src={sampleAsset(
                   `${scenarios[0].video.split('/')[0]}/confirmation.png`,
                 )}
-                alt="Original sample order confirmation screenshot"
+                alt="Original order confirmation screenshot"
               />
             </a>
           </section>
         </div>
       )}
       <Notice>
-        <strong>Public sample evidence.</strong> These are real recordings of
-        synthetic scenarios, curated from a fixed CI artifact. Live ingestion of
-        workspace artifacts is separate work.
+        <strong>Capture context.</strong> These are real recordings of synthetic
+        scenarios, curated from a fixed CI artifact. Live ingestion of workspace
+        artifacts is separate work.
       </Notice>
     </>
   );

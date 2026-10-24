@@ -39,14 +39,14 @@ export function Overview({
                 href={`#/runs/${encodeURIComponent(data.runs.find((run) => run.sample)!.id)}`}
                 className="secondary"
               >
-                Open a sample report
+                Open a report
               </a>
             )}
           </div>
         </div>
         <div className="review-summary">
           <span className="quiet-badge">
-            {data.mode === 'demo' ? 'Sample workspace' : 'Workspace evidence'}
+            {data.mode === 'demo' ? 'Preview workspace' : 'Workspace evidence'}
           </span>
           <h2>Your review queue</h2>
           <div>

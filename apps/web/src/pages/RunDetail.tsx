@@ -1,3 +1,4 @@
+import { displayLabel } from '../labels';
 import { useEffect, useState } from 'react';
 import type { Run, WorkspaceClient } from '../client';
 import { Badge, duration, Empty, Icon, Notice, PageHeading } from '../ui';
@@ -65,7 +66,7 @@ export function RunDetail({
         ← All evidence runs
       </a>
       <PageHeading
-        title={run.title}
+        title={displayLabel(run.title)}
         description={`${run.repository} · Pull request #${run.pullRequest}`}
         action={
           <div className="report-actions">
@@ -118,16 +119,14 @@ export function RunDetail({
       )}
       {run.sample && (
         <Notice>
-          <strong>Sample report.</strong> Illustrative assertions; no real
-          execution or recording.
+          <strong>Illustrative review.</strong> Statuses and assertions are
+          examples; no workspace execution is claimed.
         </Notice>
       )}
       <section className="panel report-provenance">
         <div className="panel-heading">
           <h2>Run provenance</h2>
-          <span className="quiet-badge">
-            {run.sample ? 'Sample evidence' : 'Stored evidence'}
-          </span>
+          <span className="quiet-badge">Evidence context</span>
         </div>
         <dl className="provenance-grid">
           <div>
@@ -234,7 +233,7 @@ export function RunDetail({
         <p className="sample-report-link">
           Want to inspect actual footage?{' '}
           <a href="#/evidence/sample-project">
-            Open the recorded Field Store sample
+            Open the Field Store recordings
           </a>
           . It is a separate CI run, not evidence for this illustrative report.
         </p>

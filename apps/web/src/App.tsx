@@ -286,10 +286,15 @@ export function App({ client = apiClient }: { client?: WorkspaceClient }) {
             {session.workspace.name.charAt(0).toUpperCase()}
           </span>
           <span>
-            <strong>{session.workspace.name}</strong>
+            <strong>
+              {session.mode === 'demo' &&
+              session.workspace.name === 'Sample workspace'
+                ? 'Preview workspace'
+                : session.workspace.name}
+            </strong>
             <small>
               {session.mode === 'demo'
-                ? 'Sample workspace'
+                ? 'Preview workspace'
                 : 'Private workspace'}
             </small>
           </span>
@@ -362,13 +367,12 @@ export function App({ client = apiClient }: { client?: WorkspaceClient }) {
           </form>
           <span className="topbar-status">
             <span className="status-point" />
-            {session.mode === 'demo' ? 'Sample mode' : 'Private workspace'}
+            {session.mode === 'demo' ? 'Preview mode' : 'Private workspace'}
           </span>
         </header>
         <main id="main-content" tabIndex={-1}>
           {session.mode === 'demo' && (
             <div className="sample-banner">
-              <span className="sample-label">SAMPLE DATA</span>
               <span>
                 You’re exploring illustrative evidence. No pull requests have
                 been executed.

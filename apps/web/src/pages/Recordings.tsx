@@ -36,7 +36,7 @@ export function Recordings({
         <div>
           <h2>Your workspace captures</h2>
           <p>
-            The gallery above is a curated sample imported from GitHub Actions.
+            The gallery above is curated footage imported from GitHub Actions.
             Automatic ingestion of your workspace's artifacts is not connected
             yet.
           </p>
@@ -44,7 +44,7 @@ export function Recordings({
             Get the agent instructions <Icon name="arrow" size={14} />
           </a>
         </div>
-        <span className="quiet-badge">Sample gallery available</span>
+        <span className="quiet-badge">Recording gallery available</span>
       </section>
       <details
         className="panel advanced-tools"

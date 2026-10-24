@@ -3,8 +3,13 @@ import { readFile } from 'node:fs/promises';
 
 async function openSample(page: Page, route = 'runs') {
   await page.goto(`/#/${route}`);
-  await page.getByRole('button', { name: 'Explore sample workspace' }).click();
-  await expect(page.getByText('SAMPLE DATA', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Explore workspace preview' }).click();
+  await expect(
+    page.getByText(
+      'You’re exploring illustrative evidence. No pull requests have been executed.',
+      { exact: true },
+    ),
+  ).toBeVisible();
 }
 
 test.beforeEach(async ({ request }) => {
@@ -26,7 +31,9 @@ test('sample reports preserve source commit and coverage limitations', async ({
   await expect(page.locator('tbody tr')).toHaveCount(5);
   await page.getByRole('link', { name: 'Open report for PR 286' }).click();
   await expect(page).toHaveURL(/#\/runs\/exh-1042/);
-  await expect(page.getByText('Sample report.', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('Illustrative review.', { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByText('Production payment processing', { exact: true }),
   ).toBeVisible();
@@ -67,7 +74,7 @@ test('portable reports preserve full provenance and sample qualification', async
   const download = await downloaded;
   expect(download.suggestedFilename()).toBe('exhibit-exh-1042.md');
   const report = await readFile((await download.path())!, 'utf8');
-  expect(report).toContain('SAMPLE');
+  expect(report).toContain('Illustrative review');
   expect(report).toContain('0000000000000000000000000000000000000412');
   expect(report).toContain('Production payment processing');
   expect(report).toContain('acme/storefront');

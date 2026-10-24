@@ -6,7 +6,7 @@ async function sample(
   route = 'overview',
 ) {
   await page.goto(`/#/${route}`);
-  await page.getByRole('button', { name: 'Explore sample workspace' }).click();
+  await page.getByRole('button', { name: 'Explore workspace preview' }).click();
 }
 
 test('review is the default and configuration is progressive', async ({
