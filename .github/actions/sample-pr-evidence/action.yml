@@ -1,0 +1,34 @@
+name: Exhibit sample PR evidence
+description: Gate agent-test sample PRs or collect their local browser evidence; no staging secrets or trusted verdicts
+inputs:
+  mode:
+    description: gate or collect
+    default: collect
+  playwright-json:
+    description: Playwright JSON report (collect mode)
+    default: .local/evidence/playwright.json
+  artifact-root:
+    description: Browser artifact directory (collect mode)
+    default: test-results
+  manifest-path:
+    description: Output manifest path; Markdown uses the same stem (collect mode)
+    default: .local/evidence/manifest.json
+outputs:
+  eligible:
+    description: Whether this event should run the sample evidence tests
+    value: ${{ steps.evidence.outputs.eligible }}
+  sha:
+    description: Full eligible PR head SHA to check out
+    value: ${{ steps.evidence.outputs.sha }}
+runs:
+  using: composite
+  steps:
+    - id: evidence
+      shell: bash
+      env:
+        EXHIBIT_ACTION_PATH: ${{ github.action_path }}
+        EVIDENCE_MODE: ${{ inputs.mode }}
+        PLAYWRIGHT_JSON: ${{ inputs.playwright-json }}
+        ARTIFACT_ROOT: ${{ inputs.artifact-root }}
+        MANIFEST_PATH: ${{ inputs.manifest-path }}
+      run: python3 "$EXHIBIT_ACTION_PATH/../../../scripts/pr_evidence.py" "$EVIDENCE_MODE"
