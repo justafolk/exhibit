@@ -1,6 +1,7 @@
 import type { RunList, Setup, Session, WorkspaceClient } from '../client';
 import { Icon } from '../ui';
 import { Runs } from './Runs';
+import { FeaturedEvidence } from '../components/SampleEvidence';
 
 export function Overview({
   data,
@@ -62,6 +63,7 @@ export function Overview({
           </p>
         </div>
       </section>
+      {data.mode === 'demo' && <FeaturedEvidence />}
       <Runs data={data} client={client} embedded />
     </>
   );

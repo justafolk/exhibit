@@ -14,7 +14,7 @@ test('review is the default and configuration is progressive', async ({
 }) => {
   await sample(page);
   const nav = page.getByRole('navigation', { name: 'Main navigation' });
-  await expect(nav.getByRole('link')).toHaveCount(4);
+  await expect(nav.locator('.nav-item')).toHaveCount(4);
   await expect(
     page.getByRole('heading', { name: 'Less setup. More proof.' }),
   ).toBeVisible();
@@ -26,7 +26,9 @@ test('review is the default and configuration is progressive', async ({
     page.getByRole('heading', { name: 'Give your agent the recording step' }),
   ).toBeVisible();
   await expect(
-    page.getByRole('link', { name: /Contract inspector/ }),
+    page
+      .locator('main details.advanced-tools')
+      .getByRole('link', { name: /Contract inspector/ }),
   ).not.toBeVisible();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download instructions' }).click();
@@ -36,7 +38,10 @@ test('review is the default and configuration is progressive', async ({
   await page
     .getByText('Advanced workspace configuration', { exact: true })
     .click();
-  await page.getByRole('link', { name: /Contract inspector/ }).click();
+  await page
+    .locator('main details.advanced-tools')
+    .getByRole('link', { name: /Contract inspector/ })
+    .click();
   await expect(
     page.getByRole('heading', { name: 'Prepare evidence', exact: true }),
   ).toBeVisible();
@@ -50,7 +55,7 @@ test('agent recording page never implies a hosted run and manual capture is opt-
     page.getByRole('heading', { name: 'Agent recordings', exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: 'No hosted agent recordings yet' }),
+    page.getByRole('heading', { name: 'Your workspace captures' }),
   ).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Record screen', exact: true }),

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { RunList, Session, WorkspaceClient } from '../client';
 import { Icon, PageHeading } from '../ui';
 import { Studio } from './Studio';
+import { SampleGallery } from '../components/SampleEvidence';
 
 export function Recordings({
   client,
@@ -12,7 +13,10 @@ export function Recordings({
   session: Session;
   runs: RunList;
 }) {
-  const [manualOpen, setManualOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(
+    new URLSearchParams(window.location.hash.split('?')[1]).get('manual') ===
+      '1',
+  );
   return (
     <>
       <PageHeading
@@ -24,64 +28,23 @@ export function Recordings({
           </a>
         }
       />
-      <section className="panel recording-explainer">
-        <div className="recording-intro">
-          <span className="eyebrow">AUTOMATIC CAPTURE</span>
-          <h2>
-            Your agent does the work.
-            <br />
-            Exhibit keeps the walkthrough.
-          </h2>
-          <p>
-            Video, browser traces, assertion results, and the exact commit
-            travel together. Review the result without recreating the agent's
-            steps.
-          </p>
-        </div>
-        <ol className="capture-pipeline">
-          <li>
-            <span>
-              <Icon name="branch" />
-            </span>
-            <strong>Agent runs checks</strong>
-            <p>
-              In a trusted checkout, using deterministic browser assertions.
-            </p>
-          </li>
-          <li>
-            <span>
-              <Icon name="video" />
-            </span>
-            <strong>Footage is captured</strong>
-            <p>Playwright records automatically, including failed attempts.</p>
-          </li>
-          <li>
-            <span>
-              <Icon name="file" />
-            </span>
-            <strong>Evidence is bundled</strong>
-            <p>
-              Original recordings, traces, a report, and artifact checksums.
-            </p>
-          </li>
-        </ol>
-      </section>
+      <SampleGallery />
       <section className="panel capture-empty">
         <div className="capture-empty-icon">
-          <Icon name="video" size={29} />
+          <Icon name="branch" size={25} />
         </div>
         <div>
-          <h2>No hosted agent recordings yet</h2>
+          <h2>Your workspace captures</h2>
           <p>
-            Local capture is available in this repository. Hosted upload and
-            playback are not connected. Run the local capture command to create
-            your first evidence bundle.
+            The gallery above is a curated sample imported from GitHub Actions.
+            Automatic ingestion of your workspace's artifacts is not connected
+            yet.
           </p>
-          <a href="#/agents" className="text-link">
+          <a className="text-link" href="#/agents">
             Get the agent instructions <Icon name="arrow" size={14} />
           </a>
         </div>
-        <span className="quiet-badge">Local capture available</span>
+        <span className="quiet-badge">Sample gallery available</span>
       </section>
       <details
         className="panel advanced-tools"

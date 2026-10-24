@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Session, WorkspaceClient, Workspace } from '../client';
 import { message } from '../navigation';
 import { Icon, PageHeading } from '../ui';
@@ -16,6 +16,13 @@ export function Settings({
   client: WorkspaceClient;
   onWorkspace: (workspace: Workspace) => void;
 }) {
+  useEffect(() => {
+    if (
+      new URLSearchParams(window.location.hash.split('?')[1]).get('section') ===
+      'session'
+    )
+      document.getElementById('workspace-session')?.scrollIntoView();
+  }, []);
   const [name, setName] = useState(session.workspace.name);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -131,7 +138,10 @@ export function Settings({
           </a>
         </div>
       </section>
-      <section className="panel settings-panel session-panel">
+      <section
+        id="workspace-session"
+        className="panel settings-panel session-panel"
+      >
         <div>
           <h2>Current session</h2>
           <p>

@@ -5,20 +5,27 @@ import { RunTable } from '../components/RunTable';
 import { message } from '../navigation';
 
 const statuses = Object.keys(statusLabels) as Run['status'][];
-function initialFilters(): { q: string; status: Run['status'] | '' } {
+type Outcome = Run['status'] | 'attention' | '';
+const needsAttention = (run: Run) =>
+  ['partial', 'failed', 'couldnt_run'].includes(run.status);
+function initialFilters(): { q: string; status: Outcome } {
   const params = new URLSearchParams(window.location.hash.split('?')[1]);
   const status = params.get('status');
   return {
     q: params.get('q') || '',
-    status: statuses.includes(status as Run['status'])
-      ? (status as Run['status'])
-      : '',
+    status:
+      params.get('attention') === '1'
+        ? 'attention'
+        : statuses.includes(status as Run['status'])
+          ? (status as Run['status'])
+          : '',
   };
 }
 function filterQuery(q: string, status: string) {
   const params = new URLSearchParams();
   if (q) params.set('q', q);
-  if (status) params.set('status', status);
+  if (status === 'attention') params.set('attention', '1');
+  else if (status) params.set('status', status);
   return params.size ? `?${params}` : '';
 }
 
@@ -39,6 +46,8 @@ export function Runs({
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
   const reportQuery = filterQuery(query, filter);
+  const visibleRuns =
+    filter === 'attention' ? result.runs.filter(needsAttention) : result.runs;
   useEffect(() => {
     let active = true;
     setPending(true);
@@ -46,7 +55,10 @@ export function Runs({
     const timer = window.setTimeout(
       () => {
         client
-          .listRuns({ q: query, status: filter || undefined })
+          .listRuns({
+            q: query,
+            status: filter === 'attention' ? undefined : filter || undefined,
+          })
           .then((value) => {
             if (active) setResult(value);
           })
@@ -97,6 +109,13 @@ export function Runs({
             >
               All runs
             </button>
+            <button
+              aria-pressed={filter === 'attention'}
+              className={filter === 'attention' ? 'selected' : ''}
+              onClick={() => update(query, 'attention', true)}
+            >
+              Needs attention
+            </button>
             {statuses.map((status) => (
               <button
                 key={status}
@@ -139,8 +158,8 @@ export function Runs({
           <div className="loading-state" role="status">
             Finding matching evidence…
           </div>
-        ) : result.runs.length ? (
-          <RunTable runs={result.runs} reportQuery={reportQuery} />
+        ) : visibleRuns.length ? (
+          <RunTable runs={visibleRuns} reportQuery={reportQuery} />
         ) : (
           <Empty
             title={
@@ -170,7 +189,7 @@ export function Runs({
           <span>
             {pending
               ? 'Loading matching runs…'
-              : `${result.runs.length} matching runs · latest 100 maximum`}
+              : `${visibleRuns.length} matching runs · latest 100 maximum`}
           </span>
           <span>Staging evidence</span>
         </div>

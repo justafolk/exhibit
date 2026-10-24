@@ -19,6 +19,8 @@ import { Prepare } from './pages/Prepare';
 import { Settings } from './pages/Settings';
 import { Recordings } from './pages/Recordings';
 import { AgentSetup } from './pages/AgentSetup';
+import { SampleEvidence } from './components/SampleEvidence';
+import { SidebarNavigation } from './components/SidebarNavigation';
 import { go, message, readRoute, decodeRoutePart } from './navigation';
 
 type Page =
@@ -29,7 +31,8 @@ type Page =
   | 'settings'
   | 'prepare'
   | 'studio'
-  | 'agents';
+  | 'agents'
+  | 'evidence';
 const navigation: { id: Page; label: string; icon: IconName }[] = [
   { id: 'overview', label: 'Reviews', icon: 'runs' },
   { id: 'studio', label: 'Agent recordings', icon: 'video' },
@@ -177,11 +180,13 @@ export function App({ client = apiClient }: { client?: WorkspaceClient }) {
   }, [client, session, revision]);
   const page = (route.split('/')[0].split('?')[0] || 'overview') as Page;
   const navigationPage =
-    page === 'runs'
-      ? 'overview'
-      : ['setup', 'flows', 'prepare'].includes(page)
-        ? 'agents'
-        : page;
+    page === 'evidence'
+      ? 'studio'
+      : page === 'runs'
+        ? 'overview'
+        : ['setup', 'flows', 'prepare'].includes(page)
+          ? 'agents'
+          : page;
   const selectedPage = navigation.find((item) => item.id === navigationPage);
   const runId =
     page === 'runs' && route.includes('/')
@@ -291,24 +296,11 @@ export function App({ client = apiClient }: { client?: WorkspaceClient }) {
           <span className="workspace-caret">⌄</span>
         </a>
         <div className="nav-group-label">WORKSPACE</div>
-        <nav aria-label="Main navigation">
-          {navigation.map((item) => (
-            <a
-              key={item.id}
-              aria-label={item.label}
-              onClick={() => setMobileOpen(false)}
-              href={`#/${item.id}`}
-              className={`nav-item ${navigationPage === item.id ? 'active' : ''}`}
-              aria-current={navigationPage === item.id ? 'page' : undefined}
-            >
-              <Icon name={item.icon} />
-              {item.label}
-              {item.id === 'overview' && data && (
-                <span className="nav-count">{data.runs.length}</span>
-              )}
-            </a>
-          ))}
-        </nav>
+        <SidebarNavigation
+          route={route}
+          activeGroup={navigationPage}
+          count={data?.runs.length}
+        />
         <div className="sidebar-bottom">
           <div className="boundary-note">
             <Icon name="shield" size={17} />
@@ -423,12 +415,20 @@ export function App({ client = apiClient }: { client?: WorkspaceClient }) {
             <Flows client={client} session={session} />
           ) : page === 'prepare' ? (
             <Prepare client={client} session={session} setup={setup} />
+          ) : page === 'evidence' ? (
+            <SampleEvidence key={route} />
           ) : page === 'studio' ? (
-            <Recordings client={client} session={session} runs={data} />
+            <Recordings
+              key={route}
+              client={client}
+              session={session}
+              runs={data}
+            />
           ) : page === 'agents' ? (
             <AgentSetup />
           ) : page === 'settings' ? (
             <Settings
+              key={route}
               client={client}
               onWorkspace={(workspace) => setSession({ ...session, workspace })}
               session={session}

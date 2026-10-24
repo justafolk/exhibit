@@ -256,7 +256,10 @@ test('flow definitions and contract drafts persist without authorizing execution
   await page
     .getByText('Advanced workspace configuration', { exact: true })
     .click();
-  await page.getByRole('link', { name: /Contract inspector/ }).click();
+  await page
+    .locator('main details.advanced-tools')
+    .getByRole('link', { name: /Contract inspector/ })
+    .click();
   await page.getByLabel('Repository', { exact: true }).fill('acme/storefront');
   await page.getByLabel('Pull request number', { exact: true }).fill('286');
   await page
