@@ -14,6 +14,11 @@
 - Remaining limits: no workspace ingestion, hosted execution or automatic edited
   endpoint discovery. Coordinate those with Action work; Action scripts preserved.
   Protected credentials, real payment gateways and performance are not tested.
-- Next step: publish branch and review PR, fast-forward existing deployment branch,
-  deploy via Render and verify terminal live status and public behavior.
+- Publication: PR #13 is open. Deployment branch was fast-forwarded to
+  `c8cbeed97e81587d11585fd041ad65d3b17c22a8`; Render deploy
+  `dep-dbe87jgm7kps73d0k0ag` reached live. Public readiness, frontend strings,
+  sample login/runs/logout and all 40 capture-file hashes passed. Runtime logs
+  show normal demo startup. No configuration or schema changes were required.
+- Next step: review PR #13; coordinate authenticated ingestion and actual changed
+  endpoint discovery with the separate Action work.
 - Contracts/migrations: unchanged. Main through `0a0f297` merged unchanged.
