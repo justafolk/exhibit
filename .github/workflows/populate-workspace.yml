@@ -1,0 +1,33 @@
+name: Populate workspace samples
+on:
+  workflow_dispatch:
+    inputs:
+      workspace_id:
+        description: Exact existing workspace ID authorized for illustrative sample data
+        required: true
+      owner_email:
+        description: Email of the existing workspace owner
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: provision-exhibit-workspace
+  cancel-in-progress: false
+jobs:
+  populate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      EXHIBIT_SAMPLE_WORKSPACE_ID: ${{ inputs.workspace_id }}
+      EXHIBIT_SAMPLE_OWNER_EMAIL: ${{ inputs.owner_email }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: python3 scripts/populate_workspace.py
