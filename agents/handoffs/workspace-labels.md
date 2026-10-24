@@ -11,6 +11,9 @@
   sample flags, immutable manifests and GitHub Action code are preserved.
 - `make check` passed, including 55 Python tooling tests and Go race/vet; final
   frontend check passed after caption copy changed. All 28 browser checks passed, including label cleanup and evidence qualification.
-- Publish/review this branch, fast-forward the existing deployment branch without
-  changing its PostgreSQL environment, deploy and verify the new frontend and
-  existing account data. No migration or sample re-seed is needed.
+- Published as PR #18. The deployment branch was fast-forwarded to `1384431`.
+  Render deploy `dep-dbe94rjncjis73dfc8hg` reached live. Docker build/smoke passed.
+  Public frontend labels and owner login were verified; the workspace name, eight
+  reviews, six flows and three manifests remain intact. PostgreSQL environment
+  and original source flags are preserved. No migration or re-seed was needed.
+- Next step: review PR #18. Deployment is complete.
