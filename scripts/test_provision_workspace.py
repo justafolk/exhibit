@@ -9,6 +9,13 @@ import provision_workspace as provision
 
 
 class ProvisionTests(unittest.TestCase):
+    def test_default_http_transport_decodes_json(self):
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"status":"ready"}'
+        with patch.object(provision.urllib.request, 'urlopen', return_value=response) as transport:
+            self.assertEqual(provision.request('https://example.invalid/ready'), {'status': 'ready'})
+            self.assertEqual(transport.call_count, 1)
+
     def targets(self):
         return ({'ownerId': provision.WORKSPACE, 'repo': 'https://github.com/justafolk/exhibit',
                  'serviceDetails': {'region': 'oregon'}},
