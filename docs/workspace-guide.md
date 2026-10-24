@@ -92,3 +92,17 @@ recording to a run does not change that run's verdict.
 
 The API retains recent flow, draft and recording authorship activity. An activity
 view in Settings is not implemented in this checkpoint.
+
+## Agent-first navigation
+
+The main navigation is **Reviews**, **Agent recordings**, **Agent setup**, and
+**Settings**. Give an agent the instructions from Agent setup; the agent can run
+`npm run evidence:record` from a clean checkout to automatically capture Exhibit's
+own browser self-tests. The output remains local and unverified. The hosted app
+cannot yet ingest or play those bundles.
+
+Repository/staging configuration, flow definitions and the contract inspector are
+under **Agent setup → Advanced workspace configuration**. Existing direct links
+continue to work. Manual screen recording/import is under **Agent recordings →
+Manual recording tools**, as optional supplemental context rather than the primary
+agent workflow. Closing those tools unmounts the recorder and releases capture tracks.

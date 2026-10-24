@@ -20,7 +20,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test:e2e": "playwright test",
-    "check": "npm run contracts:generate && npm run typecheck && npm run build && npm run format:check"
+    "check": "npm run contracts:generate && npm run typecheck && npm run build && npm run format:check",
+    "evidence:record": "python3 scripts/record_evidence.py"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

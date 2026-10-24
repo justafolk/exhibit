@@ -125,8 +125,8 @@ export function Settings({
         </dl>
         <div className="panel-foot split">
           <span>Permissions are assigned by your workspace administrator.</span>
-          <a className="text-link" href="#/setup">
-            Edit setup
+          <a className="text-link" href="#/agents">
+            Agent setup
             <Icon name="arrow" size={15} />
           </a>
         </div>

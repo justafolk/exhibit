@@ -25,9 +25,11 @@ function filterQuery(q: string, status: string) {
 export function Runs({
   client,
   data,
+  embedded = false,
 }: {
   client: WorkspaceClient;
   data: RunList;
+  embedded?: boolean;
 }) {
   const initial = initialFilters();
   const [query, setQuery] = useState(initial.q);
@@ -72,8 +74,9 @@ export function Runs({
   return (
     <>
       <PageHeading
-        title="Evidence runs"
-        description="Review observed behavior against the exact pull request commit."
+        level={embedded ? 2 : 1}
+        title="Review changes"
+        description="Open a result. Check the assertions. Decide what to ship."
         action={
           <button
             className="secondary"
@@ -152,15 +155,15 @@ export function Runs({
                   Clear filters
                 </button>
               ) : (
-                <a href="#/setup" className="secondary">
-                  Set up your workspace
+                <a href="#/agents" className="secondary">
+                  Set up your agent
                 </a>
               )
             }
           >
             {query || filter
               ? 'Try another search or change the outcome filter.'
-              : 'No runs are stored yet. Repository setup is the next step.'}
+              : 'No runs are stored yet. Give your agent the recording instructions to get started.'}
           </Empty>
         )}
         <div className="panel-foot split">

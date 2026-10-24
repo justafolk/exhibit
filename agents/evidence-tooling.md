@@ -161,3 +161,26 @@ real tenant sessions requires independent redaction and private artifact deliver
 which are not implemented. The collector does not blur, redact, trim or alter
 original captures. Report and manifest generation never marks a manual recording
 or edited presentation as verified evidence.
+
+### One-command recording for a coding agent
+
+From a clean, committed, trusted checkout with dependencies and Chromium installed:
+
+```sh
+npm run evidence:record
+# Optional test-title filter within this repository's sample suite:
+npm run evidence:record -- --grep 'sample reports'
+```
+
+This automatically records videos and traces, invokes the existing collector, and
+prints JSON with the commit, browser/collection exit codes and local bundle paths.
+Each run writes a new `.local/agent-captures/<run-id>/` directory. No artifact is
+uploaded. Browser failures still trigger collection and still fail the command.
+Collector failure cannot produce a successful command or claim a valid manifest.
+A dirty checkout is rejected before starting a browser. `npm run` itself prints a
+banner; callers needing only JSON can use `npm run --silent evidence:record`.
+
+This is a repository self-test offering, not a general customer runner, hosted
+recording API, published npm package, or trust attestation. The dashboard's agent
+setup page provides copyable/downloadable instructions. Keep staging credentials
+out of this workflow. See `docs/agent-experience.md` for the integration roadmap.
