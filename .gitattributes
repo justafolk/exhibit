@@ -1,1 +1,3 @@
 * text=auto eol=lf
+# Evidence downloads preserve captured bytes, including HTTP header CRLFs.
+apps/web/public/samples/field-store/** -text
