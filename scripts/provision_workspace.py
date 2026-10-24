@@ -8,6 +8,7 @@ import http.cookiejar
 import ipaddress
 import json
 import os
+import re
 import secrets
 from pathlib import Path
 import subprocess
@@ -46,7 +47,8 @@ def request(url, method='GET', data=None, headers=None, opener=None):
     except urllib.error.HTTPError as error:
         # Classify fixed operational causes; never echo provider response text,
         # which can include credentials or connection strings.
-        detail = error.read(8192).decode('utf-8', errors='replace').lower()
+        raw_detail = error.read(8192).decode('utf-8', errors='replace')
+        detail = raw_detail.lower()
         category = 'request rejected'
         for words, label in (
                 (('payment', 'billing', 'credit card', 'creditcard'), 'billing or payment setup required'),
@@ -58,8 +60,23 @@ def request(url, method='GET', data=None, headers=None, opener=None):
             if any(word in detail for word in words):
                 category = label
                 break
+        # Service-update validation messages contain no submitted credentials.
+        # Surface only the parsed message, with secrets/URLs stripped; never a body.
+        explanation = ''
+        if method == 'PATCH' and urllib.parse.urlsplit(url).path.startswith('/v1/services/'):
+            try:
+                message = json.loads(raw_detail).get('message', '')
+                if isinstance(message, str):
+                    for key, value in os.environ.items():
+                        if value and len(value)>5 and any(word in key for word in ('KEY','TOKEN','SECRET','PASSWORD','DATABASE_URL')):
+                            message = message.replace(value, '[redacted]')
+                    message = re.sub(r'(?:https?|postgres(?:ql)?):\S+', '[url]', message)
+                    message = re.sub(r'(?i)bearer\s+\S+', 'Bearer [redacted]', message)
+                    explanation = ': ' + ' '.join(message.split())[:400]
+            except (ValueError, AttributeError):
+                pass
         raise SetupError('Request failed: ' + method + ' ' + urllib.parse.urlsplit(url).path
-                         + f' (HTTP {error.code}: {category})') from None
+                         + f' (HTTP {error.code}: {category})' + explanation) from None
     except (urllib.error.URLError, ValueError):
         raise SetupError('Request failed: ' + method + ' ' + urllib.parse.urlsplit(url).path) from None
 
