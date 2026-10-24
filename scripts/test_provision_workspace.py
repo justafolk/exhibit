@@ -1,3 +1,5 @@
+import io
+import urllib.error
 import copy
 import os
 from pathlib import Path
@@ -15,6 +17,14 @@ class ProvisionTests(unittest.TestCase):
         with patch.object(provision.urllib.request, 'urlopen', return_value=response) as transport:
             self.assertEqual(provision.request('https://example.invalid/ready'), {'status': 'ready'})
             self.assertEqual(transport.call_count, 1)
+
+    def test_provider_error_is_classified_without_echoing_secrets(self):
+        error=urllib.error.HTTPError('https://api.render.com/v1/services/example',402,'Payment required',{},io.BytesIO(b'{"message":"Add billing details", "secret":"synthetic-never-print"}'))
+        with patch.object(provision.urllib.request,'urlopen',side_effect=error):
+            with self.assertRaises(provision.SetupError) as caught:provision.request('https://api.render.com/v1/services/example','PATCH',{})
+        self.assertIn('HTTP 402',str(caught.exception))
+        self.assertIn('billing or payment',str(caught.exception))
+        self.assertNotIn('synthetic-never-print',str(caught.exception))
 
     def targets(self):
         return ({'ownerId': provision.WORKSPACE, 'repo': 'https://github.com/justafolk/exhibit',
