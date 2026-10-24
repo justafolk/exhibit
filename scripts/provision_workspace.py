@@ -43,8 +43,24 @@ def request(url, method='GET', data=None, headers=None, opener=None):
         with (opener.open if opener else urllib.request.urlopen)(req, timeout=45) as response:
             body = response.read()
             return json.loads(body) if body else None
+    except urllib.error.HTTPError as error:
+        # Classify fixed operational causes; never echo provider response text,
+        # which can include credentials or connection strings.
+        detail = error.read(8192).decode('utf-8', errors='replace').lower()
+        category = 'request rejected'
+        for words, label in (
+                (('payment', 'billing', 'credit card', 'creditcard'), 'billing or payment setup required'),
+                (('insufficient', 'permission', 'unauthorized', 'forbidden'), 'insufficient permissions'),
+                (('autodeploytrigger', 'auto deploy', 'autodeploy'), 'autodeploy configuration rejected'),
+                (('plan', 'instance type'), 'service plan configuration rejected'),
+                (('disk', 'mount'), 'persistent disk configuration rejected'),
+                (('branch', 'commit'), 'source revision rejected')):
+            if any(word in detail for word in words):
+                category = label
+                break
+        raise SetupError('Request failed: ' + method + ' ' + urllib.parse.urlsplit(url).path
+                         + f' (HTTP {error.code}: {category})') from None
     except (urllib.error.URLError, ValueError):
-        # Do not print exception text, response bodies, connection strings or tokens.
         raise SetupError('Request failed: ' + method + ' ' + urllib.parse.urlsplit(url).path) from None
 
 
