@@ -8,7 +8,7 @@ async function sample(
   route = 'evidence/sample-project',
 ) {
   await page.goto(`/#/${route}`);
-  await page.getByRole('button', { name: 'Explore sample workspace' }).click();
+  await page.getByRole('button', { name: 'Explore workspace preview' }).click();
 }
 
 test('recorded sample plays real footage, preserves downloads, and exposes both attempts', async ({
@@ -19,7 +19,7 @@ test('recorded sample plays real footage, preserves downloads, and exposes both 
     page.getByRole('heading', { name: 'Checkout evidence, ready to inspect' }),
   ).toBeVisible();
   await expect(
-    page.getByText('Sample · provenance unverified', { exact: true }),
+    page.getByText('Provenance unverified', { exact: true }),
   ).toBeVisible();
   const video = page.locator('video');
   await expect
@@ -201,7 +201,7 @@ test('API evidence shows actual negative responses, downloads, and separate capt
   await page.setViewportSize({ width: 390, height: 844 });
   await sample(page, 'evidence/sample-project?section=API');
   await expect(page.locator('.api-capture-summary')).toContainText(
-    'supplemental local capture',
+    /supplemental local capture/i,
   );
   await expect(page.locator('.api-request-detail')).toContainText('HTTP 200');
   await page.getByRole('button', { name: /Reject declined payment/ }).click();
@@ -248,4 +248,36 @@ test('API evidence shows actual negative responses, downloads, and separate capt
       );
     }
   }
+});
+
+test('workspace labels stay concise without removing evidence qualification', async ({
+  page,
+}) => {
+  await page.route('**/api/v1/runs*', async (route) => {
+    if (!new URL(route.request().url()).pathname.endsWith('/runs'))
+      return route.continue();
+    const response = await route.fetch();
+    const body = await response.json();
+    body.runs[0].title = 'Sample: Saved-address checkout';
+    await route.fulfill({ response, json: body });
+  });
+  await sample(page, 'runs');
+  await expect(
+    page.getByRole('link', { name: 'Saved-address checkout', exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('.sample-tag')).toHaveCount(0);
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('link', { name: 'Recording gallery', exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole('link', { name: 'Open report for PR 286', exact: true })
+    .click();
+  await expect(
+    page.getByText('Illustrative review.', { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('.notice').first()).toContainText(
+    'Statuses and assertions are examples; no workspace execution is claimed.',
+  );
 });

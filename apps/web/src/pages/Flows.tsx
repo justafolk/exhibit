@@ -1,3 +1,4 @@
+import { displayLabel } from '../labels';
 import { useEffect, useState } from 'react';
 import type { Flow, Session, WorkspaceClient } from '../client';
 import { Empty, Icon, Notice, PageHeading } from '../ui';
@@ -134,16 +135,16 @@ export function Flows({
                       <Icon name="flow" size={19} />
                     </span>
                     <div>
-                      <h3>{flow.name}</h3>
+                      <h3>{displayLabel(flow.name)}</h3>
                       <span className="quiet-badge">
                         Authored · not approved
                       </span>
                     </div>
                     <button
                       className="text-link"
-                      aria-label={`${canEdit ? 'Edit' : 'View'} ${flow.name}`}
+                      aria-label={`${canEdit ? 'Edit' : 'View'} ${displayLabel(flow.name)}`}
                       onClick={() => {
-                        setSelected(flow);
+                        setSelected({ ...flow, name: displayLabel(flow.name) });
                         setSaved('');
                       }}
                     >
@@ -180,7 +181,7 @@ export function Flows({
               setSelected(undefined);
               setSaved(
                 session.mode === 'demo'
-                  ? 'Flow definition saved for this sample session. It is not approved for execution.'
+                  ? 'Flow definition saved for this preview session. It is not approved for execution.'
                   : 'Flow definition saved. It is not approved for execution.',
               );
             }}

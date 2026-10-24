@@ -138,7 +138,7 @@ export function SetupPage({
               <p role="status" className="save-success">
                 <Icon name="check" size={16} />
                 {session.mode === 'demo'
-                  ? 'Sample workspace details saved for this session.'
+                  ? 'Workspace details saved for this session.'
                   : 'Workspace details saved.'}
               </p>
             )}

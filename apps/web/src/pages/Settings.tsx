@@ -37,7 +37,9 @@ export function Settings({
         <div className="panel-heading">
           <h2>Workspace</h2>
           <span className="quiet-badge">
-            {session.mode === 'demo' ? 'Sample workspace' : 'Private workspace'}
+            {session.mode === 'demo'
+              ? 'Preview workspace'
+              : 'Private workspace'}
           </span>
         </div>
         <dl className="settings-list">
@@ -146,7 +148,7 @@ export function Settings({
           <h2>Current session</h2>
           <p>
             {session.mode === 'demo'
-              ? 'This session contains sample data and has no access to real repositories.'
+              ? 'This preview contains illustrative data and has no access to real repositories.'
               : 'Sign out to end your access on this browser.'}
           </p>
         </div>

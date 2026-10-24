@@ -36,7 +36,7 @@ const groups: {
     icon: 'video',
     children: [
       {
-        label: 'Sample gallery',
+        label: 'Recording gallery',
         href: 'studio',
         active: (p, q) => p === 'studio' && q.get('manual') !== '1',
       },

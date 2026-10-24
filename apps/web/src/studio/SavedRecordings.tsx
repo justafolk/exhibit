@@ -1,3 +1,4 @@
+import { displayLabel } from '../labels';
 import type { Recording } from '../client';
 import { Icon } from '../ui';
 import { downloadJSON, formatBytes, timecode } from './media';
@@ -46,7 +47,7 @@ export function SavedRecordings({
                 <Icon name="file" size={19} />
               </span>
               <div>
-                <h3>{recording.name}</h3>
+                <h3>{displayLabel(recording.name)}</h3>
                 <p>
                   {timecode(recording.durationSeconds)} ·{' '}
                   {formatBytes(recording.bytes)} ·{' '}
@@ -69,7 +70,7 @@ export function SavedRecordings({
               </div>
               <button
                 className="secondary"
-                aria-label={`Download manifest for ${recording.name}`}
+                aria-label={`Download manifest for ${displayLabel(recording.name)}`}
                 onClick={() =>
                   downloadJSON(
                     {

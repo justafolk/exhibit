@@ -8,10 +8,10 @@ In a trusted, clean checkout of justafolk/exhibit:
 1. Install dependencies with make bootstrap and install Chromium with npx playwright install chromium.
 2. Implement the change and add deterministic Playwright assertions for its behavior.
 3. Run checks and commit the change before capture. Do not weaken assertions to make a run pass.
-4. Run npm run evidence:record. To focus the sample suite: npm run evidence:record -- --grep "sample reports".
+4. Run npm run evidence:record. To focus the browser suite: npm run evidence:record -- --grep "reports".
 5. Return the generated report.md, manifest.json, videos and traces from the printed bundle directory. Include failures and coverage gaps.
 
-This command records Exhibit's own secret-free sample browser suite. It does not run customer staging flows, upload artifacts, post PR checks, or certify a verified verdict.
+This command records Exhibit's own secret-free browser suite. It does not run customer staging flows, upload artifacts, post PR checks, or certify a verified verdict.
 Never put customer credentials in this workflow. Hosted execution and ingestion are not connected yet.
 `;
 export function AgentSetup() {
@@ -48,7 +48,7 @@ export function AgentSetup() {
               <li>
                 <strong>Check the behavior</strong>
                 <p>
-                  Run deterministic browser assertions against Exhibit's sample
+                  Run deterministic browser assertions against Exhibit's fixture
                   app.
                 </p>
               </li>

@@ -48,7 +48,7 @@ async function sampleClip(page: Page): Promise<Buffer> {
 
 async function studio(page: Page) {
   await page.goto('/#/studio');
-  await page.getByRole('button', { name: 'Explore sample workspace' }).click();
+  await page.getByRole('button', { name: 'Explore workspace preview' }).click();
   await page
     .getByText('Manual recording tools · optional', { exact: true })
     .click();

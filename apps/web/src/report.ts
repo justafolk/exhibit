@@ -1,3 +1,4 @@
+import { displayLabel } from './labels';
 import type { Run } from './client';
 import { statusLabels } from './ui';
 
@@ -5,10 +6,10 @@ const inline = (value: string) =>
   value.replace(/[\r\n]+/g, ' ').replace(/[\\`*_{}\[\]<>#!|]/g, '\\$&');
 export function markdownReport(run: Run): string {
   const lines = [
-    `# Evidence report: ${inline(run.title)}`,
+    `# Evidence report: ${inline(displayLabel(run.title))}`,
     '',
     run.sample
-      ? '**SAMPLE — illustrative assertions; no real execution or recording.**'
+      ? '**Illustrative review — statuses and assertions are examples; no workspace execution is claimed.**'
       : '**Stored evidence report.**',
     '',
     `- Recorded outcome: ${statusLabels[run.status]}`,

@@ -1,3 +1,4 @@
+import { displayLabel } from '../labels';
 import { useEffect, useState } from 'react';
 import type {
   ContractDraft,
@@ -80,7 +81,7 @@ export function Prepare({
       setDirty(false);
       setSaved(
         session.mode === 'demo'
-          ? 'Draft saved for this sample session.'
+          ? 'Draft saved for this preview session.'
           : 'Draft saved.',
       );
     } catch (reason) {
@@ -286,7 +287,7 @@ export function Prepare({
                     <label className="flow-option" key={flow.id}>
                       <input
                         type="checkbox"
-                        aria-label={flow.name}
+                        aria-label={displayLabel(flow.name)}
                         checked={draft.flowIds.includes(flow.id)}
                         onChange={(event) =>
                           update(
@@ -298,7 +299,7 @@ export function Prepare({
                         }
                       />
                       <span>
-                        <strong>{flow.name}</strong>
+                        <strong>{displayLabel(flow.name)}</strong>
                         <small>
                           {flow.assertions.length} assertions · authored, not
                           approved
