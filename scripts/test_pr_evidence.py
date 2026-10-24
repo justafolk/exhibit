@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from evidence_tool import InvalidEvidence, outcome, verify_artifacts
-from pr_evidence import collect, eligible
+from pr_evidence import collect, eligible, main
 
 
 def event():
@@ -88,6 +88,26 @@ class PREvidenceTests(unittest.TestCase):
             data = browser_report(); data["suites"] = []
             manifest = capture(data, Path(directory), "justafolk/sample-project-exhibit", "a" * 40, "sample-pr-1", 1, pull_request=12)
             self.assertEqual(outcome(manifest), "Could not run")
+
+
+    def test_missing_required_video_fails_and_preserves_honest_report(self):
+        from evidence_capture import capture
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = capture(browser_report(), root, "justafolk/sample-project-exhibit", "a" * 40,
+                               "sample-pr-123", 1, pull_request=12)
+            path = root / "event.json"; path.write_text(json.dumps(event()))
+            playwright = root / "browser.json"; playwright.write_text(json.dumps(browser_report()))
+            output = root / "output/manifest.json"; summary = root / "summary"
+            environment = {"GITHUB_EVENT_PATH":str(path), "GITHUB_EVENT_NAME":"pull_request",
+                "PLAYWRIGHT_JSON":str(playwright), "ARTIFACT_ROOT":str(root), "GITHUB_RUN_ID":"123",
+                "GITHUB_RUN_ATTEMPT":"1", "MANIFEST_PATH":str(output), "GITHUB_STEP_SUMMARY":str(summary)}
+            for required, expected in (("true", 1), ("false", 0)):
+                with patch.dict(os.environ, {**environment, "REQUIRE_VIDEO":required}), patch("sys.argv", ["pr_evidence.py", "collect"]), patch("pr_evidence.collect", return_value=manifest):
+                    self.assertEqual(main(), expected)
+            self.assertEqual(json.loads(output.read_text())["artifacts"], [])
+            self.assertEqual(json.loads(output.with_name("recordings.json").read_text())["recordings"], [])
+            self.assertIn("No video artifact was produced", output.with_suffix(".md").read_text())
 
     def test_gate_cli_outputs_only_eligible_sha(self):
         script = str(Path(__file__).with_name("pr_evidence.py"))
