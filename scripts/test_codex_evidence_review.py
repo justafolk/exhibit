@@ -8,7 +8,7 @@ import tomllib
 import unittest
 from unittest.mock import patch
 
-from codex_evidence_review import cli_command, main, prepare, run_cli
+from codex_evidence_review import cli_command, cli_failure_category, main, prepare, run_cli
 from evidence_capture import capture
 from evidence_tool import InvalidEvidence
 from pr_evidence import recording_index
@@ -63,6 +63,15 @@ class CodexReviewTests(unittest.TestCase):
         self.assertIs(profile['network']['enabled'], False)
         self.assertEqual(profile['filesystem'], {'/tmp/auth':'deny', '/proc':'deny'})
         self.assertEqual(config['approval_policy'], 'never')
+
+    def test_diagnostic_categories_never_echo_provider_text(self):
+        for text, category in (("permission denied: synthetic-credential", "runner permissions"),
+                               ("401 unauthorized: synthetic-credential", "account authentication"),
+                               ("bwrap failed: synthetic-credential", "runner sandbox"),
+                               ("unknown failure synthetic-credential", "CLI execution")):
+            result = subprocess.CompletedProcess([], 1, "", text)
+            self.assertEqual(cli_failure_category(result), category)
+            self.assertNotIn("synthetic-credential", cli_failure_category(result))
 
     def test_missing_auth_is_explicitly_not_run(self):
         with tempfile.TemporaryDirectory() as directory:
