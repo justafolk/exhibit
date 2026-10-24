@@ -161,3 +161,27 @@ real tenant sessions requires independent redaction and private artifact deliver
 which are not implemented. The collector does not blur, redact, trim or alter
 original captures. Report and manifest generation never marks a manual recording
 or edited presentation as verified evidence.
+
+## Opt-in sample PR evidence (`agent-test`)
+
+The composite action `.github/actions/sample-pr-evidence` adds a bounded customer-side CI integration for `justafolk/sample-project-exhibit`. It has two modes: `gate` emits eligibility and the immutable PR head SHA; `collect` reads real Playwright JSON, checks startup/checkout provenance and hashes actual browser artifacts, then writes a manifest and Markdown report to the job summary. This is a sample CI integration, not a webhook receiver, durable scheduler, customer staging runner, or trusted verifier.
+
+The sample caller listens for `opened`, `reopened`, `synchronize`, `labeled` and `ready_for_review`. Eligible PRs must be open, non-draft, same-repository, and carry the exact `agent-test` label. Adding another label does not rerun it. Removing `agent-test` disables later runs; converting to ready-for-review runs a labelled draft. Forks and `pull_request_target` are rejected. The gate is evaluated before checkout or npm installation. Each attempt uses a fresh GitHub-hosted runner with read-only repository permissions and no inherited secrets; it checks out the event's head SHA rather than GitHub's synthetic merge commit. Old attempts retain their original head SHA instead of claiming to test newer commits.
+
+The sample workflow pins this action to a full Exhibit commit. Merge the Exhibit support PR before the sample integration PR, then update the pin through review when tooling changes. For a private Exhibit repository, GitHub must allow this repository's actions to be shared with the sample repository under **Settings → Actions → General → Access** (the appropriate same-owner sharing option). GitHub handles fetching shared private actions; a broad personal token or `secrets: inherit` is not needed. Repository/organization policy must also allow the pinned GitHub actions. The action is intentionally restricted to this named sample repository, not arbitrary customer code.
+
+The sample runs both API tests and browser tests. API and browser step outcomes are recorded separately in the summary; either failure fails the job. Browser assertions, videos, traces and screenshots appear in a seven-day artifact bundle with the PR number, actual SHA, workflow run ID and attempt. Collection runs after browser failures when a report exists, and missing/invalid capture data fails collection. Startup or install failures still get an explicit stage summary without fabricated assertions or manifests. A passing suite remains **Unverified**; expected-failure tests are skipped coverage, not successful evidence. No deployment, production payment, customer secret, PR comment, trusted verdict or Exhibit database run is created.
+
+Local checks:
+
+```sh
+python3 -m unittest discover -s scripts -p 'test_*.py'
+# From a clean, committed sample checkout after a capture-enabled browser run:
+GITHUB_EVENT_NAME=pull_request GITHUB_EVENT_PATH=/path/to/sample-event.json \
+GITHUB_RUN_ID=123 GITHUB_RUN_ATTEMPT=1 \
+PLAYWRIGHT_JSON=.local/evidence/playwright.json ARTIFACT_ROOT=test-results \
+MANIFEST_PATH=.local/evidence/manifest.json GITHUB_STEP_SUMMARY=.local/evidence/summary.md \
+python3 /path/to/exhibit/scripts/pr_evidence.py collect
+```
+
+The event must describe this sample repository, label and actual checked-out SHA. The collector never executes commands from the event, runbook, PR title or report. This self-reported capture is not a security boundary against PR code changing files on its runner.
