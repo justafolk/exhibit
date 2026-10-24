@@ -43,7 +43,12 @@ const groups: {
       {
         label: 'Evidence explorer',
         href: 'evidence/sample-project',
-        active: (p) => p === 'evidence',
+        active: (p, q) => p === 'evidence' && q.get('section') !== 'API',
+      },
+      {
+        label: 'API / cURL evidence',
+        href: 'evidence/sample-project?section=API',
+        active: (p, q) => p === 'evidence' && q.get('section') === 'API',
       },
       {
         label: 'Manual tools',

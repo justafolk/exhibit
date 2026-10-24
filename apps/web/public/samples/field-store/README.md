@@ -24,3 +24,11 @@ Each `preview.png` is a display-only preview. Checkout uses the original confirm
 screenshot; the other previews are extracted frames. Originals are never edited.
 `apps/web/src/sample/fieldStore.ts` projects metadata from the source manifest and
 Playwright JSON; it does not add these runs to a tenant or change a server verdict.
+
+## API supplement
+
+`api-evidence/` contains a separate local cURL capture of the same clean source
+commit. Its manifest records 11 requests, actual responses/headers, assertions,
+timing and byte hashes. It is not part of the original CI archive. The source PR
+changed workflow configuration, not API code. All data is synthetic, and captured
+commands point to a local sample server; setup requests must precede replay.

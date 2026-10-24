@@ -67,3 +67,24 @@ workspace-scoped records and private expiring media access. Keep PR/head identit
 all attempts, original bytes and explicit verification state. Do not fetch private
 GitHub artifacts from browser code, expose tokens, or accept a client-supplied
 verified verdict. A failed prior attempt stays visible after a successful retry.
+
+## Supplemental cURL evidence
+
+The API tab and sidebar link show 11 actual cURL requests against a clean checkout
+of the same source SHA, served locally on port 4175. This is a separate capture,
+not an addition to the original CI manifest or a claim that PR #1 edited APIs.
+It covers setup, successful checkout, persisted order, malformed JSON, declined
+payment and unavailable stock with no order created, and scoped cleanup.
+Expected 400/402/409 responses are successful negative checks. Each request stores
+the command, exact response bytes and headers, HTTP and cURL exit statuses,
+measured duration, capture timestamp, body assertions and file SHA-256 hashes.
+The UI offers command copying and byte-preserving downloads; it does not execute
+commands from the browser. Requests use synthetic data without authentication.
+
+For the separate Action work: collect API evidence when a PR edits endpoints and
+map requests to actual changed routes/files. Preserve source SHA, environment,
+expected versus observed status, assertions, original redacted request/response
+files and hashes. Capture before redaction only in protected ephemeral storage;
+publish sanitized artifacts with no credentials, session cookies or customer
+payloads. Never infer successful execution from a command string. Live collection
+and automatic changed-endpoint discovery are not implemented by this dashboard.

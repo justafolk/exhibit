@@ -193,3 +193,59 @@ test('unavailable video shows a useful error instead of a claimed successful pla
     }),
   ).toBeVisible();
 });
+
+test('API evidence shows actual negative responses, downloads, and separate capture provenance', async ({
+  page,
+  request,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await sample(page, 'evidence/sample-project?section=API');
+  await expect(page.locator('.api-capture-summary')).toContainText(
+    'supplemental local capture',
+  );
+  await expect(page.locator('.api-request-detail')).toContainText('HTTP 200');
+  await page.getByRole('button', { name: /Reject declined payment/ }).click();
+  await expect(page.locator('.api-request-detail')).toContainText('HTTP 402');
+  await expect(page.getByLabel('Response body', { exact: true })).toContainText(
+    'Sample payment declined',
+  );
+  await expect(page.getByLabel('cURL command', { exact: true })).toContainText(
+    '--request POST',
+  );
+  const downloadEvent = page.waitForEvent('download');
+  await page
+    .getByRole('link', { name: 'declined.response.json', exact: true })
+    .click();
+  expect(
+    JSON.parse(await readFile((await (await downloadEvent).path())!, 'utf8'))
+      .error,
+  ).toContain('payment declined');
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  const manifest = await (
+    await request.get('/samples/field-store/api-evidence/manifest.json')
+  ).json();
+  expect(manifest).toMatchObject({
+    headSha: sourceSha,
+    origin: 'supplemental-local-curl',
+    verification: 'unverified',
+  });
+  expect(manifest.calls).toHaveLength(11);
+  for (const call of manifest.calls) {
+    expect(call.httpStatus).toBe(call.expectedStatus);
+    expect(call.curlExitCode).toBe(0);
+    expect(call.checks.every((c: { passed: boolean }) => c.passed)).toBe(true);
+    for (const file of call.files) {
+      const response = await request.get(`/samples/field-store/${file.path}`);
+      expect(response.ok()).toBe(true);
+      const bytes = await response.body();
+      expect(bytes.length).toBe(file.bytes);
+      expect(createHash('sha256').update(bytes).digest('hex')).toBe(
+        file.sha256,
+      );
+    }
+  }
+});

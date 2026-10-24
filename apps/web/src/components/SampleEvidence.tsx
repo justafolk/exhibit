@@ -1,3 +1,4 @@
+import { APIEvidence } from './APIEvidence';
 import { useEffect, useRef, useState } from 'react';
 import {
   fieldStore,
@@ -7,7 +8,7 @@ import {
 import { Icon, Notice, PageHeading } from '../ui';
 
 const scenarios = fieldStore.scenarios;
-const sections = ['Overview', 'Artifacts', 'Provenance'] as const;
+const sections = ['Overview', 'API', 'Artifacts', 'Provenance'] as const;
 const fileKind = (mime: string) =>
   mime.startsWith('video/')
     ? 'Video'
@@ -410,6 +411,7 @@ export function SampleEvidence() {
           </section>
         </>
       )}
+      {section === 'API' && <APIEvidence />}
       {section === 'Artifacts' && (
         <section className="panel evidence-artifacts">
           <div className="panel-heading">
