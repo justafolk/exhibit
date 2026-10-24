@@ -140,7 +140,7 @@ def validate_manifest(value, expected_sha=None):
         matching(artifact["sha256"], DIGEST, "artifact sha256")
         integer(artifact["bytes"], "artifact bytes", 1, MAX_ARTIFACT_BYTES)
         total += artifact["bytes"]
-        choice(artifact["mediaType"], ("video/webm", "video/mp4", "image/png", "application/zip", "application/json", "text/plain"), "artifact mediaType")
+        choice(artifact["mediaType"], ("video/webm", "video/mp4", "image/png", "image/gif", "application/zip", "application/json", "text/plain"), "artifact mediaType")
     require(total <= MAX_ARTIFACT_BYTES, "combined artifacts exceed size limit")
     string_list(value["notCovered"], "notCovered")
     fields(value["cleanup"], ("status", "details"), "cleanup")

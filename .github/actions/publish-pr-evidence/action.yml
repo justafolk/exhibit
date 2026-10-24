@@ -1,0 +1,44 @@
+name: Publish PR evidence as account owner
+description: Post or update a user-authored report with embedded animated previews and full video links
+inputs:
+  phase:
+    description: start posts the pre-test notification; completed publishes the report
+    default: completed
+  comment-token:
+    description: EXHIBIT_COMMENT_TOKEN belonging to justafolk with PR read/write permission
+    required: true
+  media-token:
+    description: Workflow token with contents write and actions read for completed preview assets
+    default: ''
+  bundle:
+    description: Directory with report/ and evidence/ artifacts (completed phase)
+    default: ''
+  head-sha:
+    description: Expected head SHA
+    required: true
+  pull-request:
+    description: Expected PR number
+    required: true
+outputs:
+  status:
+    description: published or skipped_stale
+    value: ${{ steps.publish.outputs.status }}
+  comment-url:
+    description: Link to the user-authored report comment
+    value: ${{ steps.publish.outputs.comment-url }}
+runs:
+  using: composite
+  steps:
+    - id: publish
+      shell: bash
+      env:
+        EXHIBIT_ACTION_PATH: ${{ github.action_path }}
+        PUBLISH_PHASE: ${{ inputs.phase }}
+        EXHIBIT_COMMENT_TOKEN: ${{ inputs.comment-token }}
+        MEDIA_TOKEN: ${{ inputs.media-token }}
+        COMMENT_BUNDLE: ${{ inputs.bundle }}
+        EXPECTED_SHA: ${{ inputs.head-sha }}
+        EXPECTED_PR: ${{ inputs.pull-request }}
+        EXPECTED_RUN_ID: ${{ github.run_id }}
+        EXPECTED_ATTEMPT: ${{ github.run_attempt }}
+      run: python3 "$EXHIBIT_ACTION_PATH/../../../scripts/pr_evidence_comment.py"
