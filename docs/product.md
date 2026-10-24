@@ -20,6 +20,13 @@ wall-time and sandbox budgets before any paid execution is enabled.
 
 ## Current workspace
 
+Agents produce evidence; humans review it. The primary experience is a review queue,
+agent recordings, one agent handoff, and settings. Form-based staging setup, flow
+definitions and contract inspection are advanced operator tools, not the default journey.
+`npm run evidence:record` now automates capture and local evidence collection for this
+repository’s sample browser suite. Hosted customer execution and ingestion remain pending.
+See [the experience research and priorities](agent-experience.md).
+
 The light-mode workspace provides private account sign-in, server-enforced workspace
 roles, isolated sample exploration, overview and run reports, and persistent repository
 and staging setup. Flow definitions and contract drafts make evidence preparation reusable;

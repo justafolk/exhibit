@@ -84,6 +84,16 @@ tests/e2e/            Playwright behavior checks
 docs/                 Product, architecture, development and deployment
 ```
 
+## Automatic recording for agents
+
+After committing a change, run `npm run evidence:record` from this repository. It
+records the sample browser suite and returns a local bundle with videos, traces,
+checksums and an unverified report. No screen-sharing steps or dashboard forms are
+required. Dependencies and Chromium must be installed. This is a repository self-test;
+customer execution, hosted ingestion and PR publishing are not connected yet.
+
+See [agent experience and feature research](docs/agent-experience.md).
+
 ## Verify
 
 ```sh

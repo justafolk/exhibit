@@ -230,6 +230,15 @@ export function RunDetail({
           )}
         </div>
       </section>
+      {run.sample && (
+        <p className="sample-report-link">
+          Want to inspect actual footage?{' '}
+          <a href="#/evidence/sample-project">
+            Open the recorded Field Store sample
+          </a>
+          . It is a separate CI run, not evidence for this illustrative report.
+        </p>
+      )}
       <Notice>
         Recordings and traces are not attached to this report. Artifact
         collection must be connected before downloads are available.

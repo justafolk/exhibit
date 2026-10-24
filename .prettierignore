@@ -8,3 +8,5 @@ requirements.md
 go.sum
 playwright-report
 test-results
+# Immutable imported evidence; formatting would change the original bytes.
+apps/web/public/samples/field-store/

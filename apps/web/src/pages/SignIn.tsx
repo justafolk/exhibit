@@ -31,7 +31,9 @@ export function SignIn({
     <div className="auth-page">
       <header>
         <Brand />
-        <span className="auth-note">Evidence for every change.</span>
+        <span className="auth-note">
+          Your agent ships code. Exhibit brings the evidence.
+        </span>
       </header>
       <main className="auth-main">
         <div className="auth-card">
@@ -40,9 +42,8 @@ export function SignIn({
           </div>
           <h1>Welcome to Exhibit</h1>
           <p className="auth-description">
-            Sign in to your workspace to review evidence,
-            <br className="desktop-only" /> prepare flows, and ship with
-            context.
+            Review agent-authored changes with their assertions,
+            <br className="desktop-only" /> recordings, and coverage gaps.
           </p>
           <form onSubmit={submit}>
             <label htmlFor="email">Email address</label>

@@ -49,6 +49,9 @@ async function sampleClip(page: Page): Promise<Buffer> {
 async function studio(page: Page) {
   await page.goto('/#/studio');
   await page.getByRole('button', { name: 'Explore sample workspace' }).click();
+  await page
+    .getByText('Manual recording tools · optional', { exact: true })
+    .click();
   await expect(
     page.getByRole('heading', { name: 'Recording studio', exact: true }),
   ).toBeVisible();
@@ -136,6 +139,9 @@ test('recording presentation preserves original bytes and saves only unverified 
   expect(metadataPosts).toBe(1);
   expect(await (await page.request.get('/api/v1/runs')).json()).toEqual(before);
   await page.reload();
+  await page
+    .getByText('Manual recording tools · optional', { exact: true })
+    .click();
   await expect(
     page.getByRole('button', {
       name: 'Download manifest for Checkout walkthrough',
@@ -299,7 +305,7 @@ test('screen recorder produces playable local bytes and releases shared tracks',
   ).toBeVisible();
   await page
     .getByRole('navigation', { name: 'Main navigation' })
-    .getByRole('link', { name: 'Overview', exact: true })
+    .getByRole('link', { name: 'Reviews', exact: true })
     .click();
   await expect
     .poll(() =>

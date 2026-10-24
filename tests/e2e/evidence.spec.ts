@@ -142,7 +142,7 @@ test('invalid report links show a recoverable error', async ({ page }) => {
   ).toBeVisible();
   await page
     .getByRole('navigation', { name: 'Main navigation' })
-    .getByRole('link', { name: /Evidence runs/ })
+    .getByRole('link', { name: 'Reviews', exact: true })
     .click();
   await expect(page.locator('tbody tr')).toHaveCount(5);
 });
@@ -193,9 +193,12 @@ test('mobile navigation and logout are usable', async ({ page }) => {
     page.getByRole('button', { name: 'Open navigation' }),
   ).toBeFocused();
   await page.getByRole('button', { name: 'Open navigation' }).click();
-  await page.getByRole('link', { name: 'Flow catalog', exact: true }).click();
+  await page.getByRole('link', { name: 'Agent setup', exact: true }).click();
   await expect(
-    page.getByRole('heading', { name: 'Flow catalog', exact: true }),
+    page.getByRole('heading', {
+      name: 'Give your agent the recording step',
+      exact: true,
+    }),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
@@ -249,9 +252,13 @@ test('flow definitions and contract drafts persist without authorizing execution
     'Dedicated test tenant\nSaved address exists',
   );
   await page.keyboard.press('Escape');
+  await page.goto('/#/agents');
   await page
-    .getByRole('navigation', { name: 'Main navigation' })
-    .getByRole('link', { name: 'Prepare evidence', exact: true })
+    .getByText('Advanced workspace configuration', { exact: true })
+    .click();
+  await page
+    .locator('main details.advanced-tools')
+    .getByRole('link', { name: /Contract inspector/ })
     .click();
   await page.getByLabel('Repository', { exact: true }).fill('acme/storefront');
   await page.getByLabel('Pull request number', { exact: true }).fill('286');

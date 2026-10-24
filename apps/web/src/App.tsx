@@ -17,18 +17,26 @@ import { SetupPage } from './pages/SetupPage';
 import { Flows } from './pages/Flows';
 import { Prepare } from './pages/Prepare';
 import { Settings } from './pages/Settings';
-import { Studio } from './pages/Studio';
+import { Recordings } from './pages/Recordings';
+import { AgentSetup } from './pages/AgentSetup';
+import { SampleEvidence } from './components/SampleEvidence';
+import { SidebarNavigation } from './components/SidebarNavigation';
 import { go, message, readRoute, decodeRoutePart } from './navigation';
 
 type Page =
-  'overview' | 'runs' | 'setup' | 'flows' | 'settings' | 'prepare' | 'studio';
+  | 'overview'
+  | 'runs'
+  | 'setup'
+  | 'flows'
+  | 'settings'
+  | 'prepare'
+  | 'studio'
+  | 'agents'
+  | 'evidence';
 const navigation: { id: Page; label: string; icon: IconName }[] = [
-  { id: 'overview', label: 'Overview', icon: 'overview' },
-  { id: 'runs', label: 'Evidence runs', icon: 'runs' },
-  { id: 'setup', label: 'Workspace setup', icon: 'setup' },
-  { id: 'flows', label: 'Flow catalog', icon: 'flow' },
-  { id: 'prepare', label: 'Prepare evidence', icon: 'file' },
-  { id: 'studio', label: 'Recording studio', icon: 'video' },
+  { id: 'overview', label: 'Reviews', icon: 'runs' },
+  { id: 'studio', label: 'Agent recordings', icon: 'video' },
+  { id: 'agents', label: 'Agent setup', icon: 'branch' },
   { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
@@ -171,7 +179,15 @@ export function App({ client = apiClient }: { client?: WorkspaceClient }) {
     };
   }, [client, session, revision]);
   const page = (route.split('/')[0].split('?')[0] || 'overview') as Page;
-  const selectedPage = navigation.find((item) => item.id === page);
+  const navigationPage =
+    page === 'evidence'
+      ? 'studio'
+      : page === 'runs'
+        ? 'overview'
+        : ['setup', 'flows', 'prepare'].includes(page)
+          ? 'agents'
+          : page;
+  const selectedPage = navigation.find((item) => item.id === navigationPage);
   const runId =
     page === 'runs' && route.includes('/')
       ? decodeRoutePart(route.split('/')[1].split('?')[0])
@@ -280,23 +296,11 @@ export function App({ client = apiClient }: { client?: WorkspaceClient }) {
           <span className="workspace-caret">⌄</span>
         </a>
         <div className="nav-group-label">WORKSPACE</div>
-        <nav aria-label="Main navigation">
-          {navigation.map((item) => (
-            <a
-              key={item.id}
-              onClick={() => setMobileOpen(false)}
-              href={`#/${item.id}`}
-              className={`nav-item ${page === item.id ? 'active' : ''}`}
-              aria-current={page === item.id ? 'page' : undefined}
-            >
-              <Icon name={item.icon} />
-              {item.label}
-              {item.id === 'runs' && data && (
-                <span className="nav-count">{data.runs.length}</span>
-              )}
-            </a>
-          ))}
-        </nav>
+        <SidebarNavigation
+          route={route}
+          activeGroup={navigationPage}
+          count={data?.runs.length}
+        />
         <div className="sidebar-bottom">
           <div className="boundary-note">
             <Icon name="shield" size={17} />
@@ -369,8 +373,8 @@ export function App({ client = apiClient }: { client?: WorkspaceClient }) {
                 You’re exploring illustrative evidence. No pull requests have
                 been executed.
               </span>
-              <a href="#/setup">
-                Workspace setup
+              <a href="#/agents">
+                Agent setup
                 <Icon name="arrow" size={14} />
               </a>
             </div>
@@ -411,10 +415,20 @@ export function App({ client = apiClient }: { client?: WorkspaceClient }) {
             <Flows client={client} session={session} />
           ) : page === 'prepare' ? (
             <Prepare client={client} session={session} setup={setup} />
+          ) : page === 'evidence' ? (
+            <SampleEvidence key={route} />
           ) : page === 'studio' ? (
-            <Studio client={client} session={session} runs={data} />
+            <Recordings
+              key={route}
+              client={client}
+              session={session}
+              runs={data}
+            />
+          ) : page === 'agents' ? (
+            <AgentSetup />
           ) : page === 'settings' ? (
             <Settings
+              key={route}
               client={client}
               onWorkspace={(workspace) => setSession({ ...session, workspace })}
               session={session}
@@ -422,11 +436,16 @@ export function App({ client = apiClient }: { client?: WorkspaceClient }) {
               pending={logoutPending}
             />
           ) : (
-            <Overview data={data} setup={setup} session={session} />
+            <Overview
+              data={data}
+              setup={setup}
+              session={session}
+              client={client}
+            />
           )}
           <footer className="page-footer">
             <span>Exhibit · evidence with context</span>
-            <span>Built for human review.</span>
+            <span>Built for agents. Reviewed by humans.</span>
           </footer>
         </main>
       </div>
