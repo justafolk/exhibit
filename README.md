@@ -4,8 +4,8 @@
 
 Exhibit is a PR evidence platform: run a reviewed flow against staging dependencies,
 then attach deterministic assertions, provenance and recordings to the exact commit.
-This repository is the runnable MVP foundation, with a light-mode dashboard and a
-Go/PostgreSQL control plane.
+This repository is the runnable workspace application, with a light-mode React interface
+and a Go/PostgreSQL control plane. Customer execution remains a separate integration.
 
 ## Start locally
 
@@ -20,14 +20,19 @@ make dev
 
 Open the local URL printed by Vite. Ports are allocated per checkout in `.env`.
 The default experience is **sample evidence**: no GitHub installation, staging secrets,
-agent subscription or database is needed. Use “Check a contract” to call the real Go evaluator.
+agent subscription or database is needed. Choose **Explore sample workspace** on the
+sign-in screen. **Prepare evidence** calls the real Go completeness evaluator.
 
 ```sh
 make db-up
 make migrate
-make seed
-# Set EXHIBIT_STORE=postgres in .env, then restart make dev.
+# Provision a private owner using docs/workspace-guide.md.
+# Use EXHIBIT_STORE=postgres EXHIBIT_COOKIE_SECURE=false make dev for local HTTP.
 ```
+
+The [workspace guide](docs/workspace-guide.md) covers private owner provisioning,
+setup, flows and evidence preparation. `make seed` is optional; seeded records are
+quarantined in an unclaimed sample workspace, never assigned to a new owner implicitly.
 
 ## Parallel AI development
 
@@ -46,15 +51,21 @@ to the same canonical guidance.
 
 ## What works today
 
-- Responsive light-mode dashboard; search/filter runs; inspect assertions and coverage gaps.
+- Private password sign-in, revocable cookie sessions, workspace roles and tenant isolation.
+- Responsive light-mode workspace with URL-preserved search and commit-linked reports.
+- Persistent setup, authored flow definitions, editable contract drafts and workspace settings.
+- Qualified Markdown report copy/download, including assertions and coverage gaps.
+- Local screen capture/video import, chapter playback, framing and original-file checksum manifests.
+- Tenant-scoped manual recording metadata and recent preparation activity; media stays local.
 - Real HTTP contract evaluation with `ready`, `needs_info`, and `not_testable` outcomes.
 - Explicit sample mode or PostgreSQL run reads; readiness and build-provenance endpoints.
 - Checked migrations, local sample seeding, shared OpenAPI and generated client types.
 - Unit, race, database, browser, format, type and container checks in GitHub Actions.
+- Agent request/manifest validation, checksum checks and optional sample browser recordings in CI.
 - Agent context, flow/runbook examples, task handoffs and worktree automation.
 
-**Not implemented yet:** GitHub App installation/webhooks, user/tenant authentication,
-job execution, agent SDK integration, artifact upload/redaction, and posting evidence
+**Not implemented yet:** live GitHub App installation/webhook ingress, public identity recovery,
+isolated customer execution, agent SDK execution, trusted artifact upload/redaction, and posting evidence
 to PRs. The UI does not fabricate working integrations. Start with the ordered
 [backlog](agents/backlog.md); the foundation is not a public multi-tenant service.
 

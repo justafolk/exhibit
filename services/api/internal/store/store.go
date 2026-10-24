@@ -5,6 +5,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -32,8 +35,13 @@ type Run struct {
 	Assertions      []Assertion `json:"assertions"`
 	NotCovered      []string    `json:"notCovered"`
 }
+type RunFilter struct {
+	Query  string
+	Status string
+}
+
 type Store interface {
-	List(context.Context) ([]Run, error)
+	List(context.Context, RunFilter) ([]Run, error)
 	Get(context.Context, string) (Run, error)
 	Ping(context.Context) error
 	Mode() string
@@ -52,9 +60,24 @@ func Samples() []Run {
 
 type Demo struct{}
 
-func (Demo) Mode() string                        { return "demo" }
-func (Demo) Ping(context.Context) error          { return nil }
-func (Demo) List(context.Context) ([]Run, error) { return Samples(), nil }
+func (Demo) Mode() string               { return "demo" }
+func (Demo) Ping(context.Context) error { return nil }
+func (Demo) List(_ context.Context, filter RunFilter) ([]Run, error) {
+	runs := []Run{}
+	for _, run := range Samples() {
+		haystack := strings.ToLower(strings.Join([]string{run.Title, run.Repository, strconv.Itoa(run.PullRequest), run.ID, run.HeadSHA}, " "))
+		if (filter.Status == "" || filter.Status == run.Status) && strings.Contains(haystack, strings.ToLower(filter.Query)) {
+			runs = append(runs, run)
+		}
+	}
+	slices.SortFunc(runs, func(a, b Run) int {
+		if order := b.CreatedAt.Compare(a.CreatedAt); order != 0 {
+			return order
+		}
+		return strings.Compare(b.ID, a.ID)
+	})
+	return runs[:min(100, len(runs))], nil
+}
 func (Demo) Get(_ context.Context, id string) (Run, error) {
 	for _, r := range Samples() {
 		if r.ID == id {
@@ -72,7 +95,7 @@ func (p Postgres) Ping(ctx context.Context) error {
 		return err
 	}
 	// Ready means migrations exist too, not merely an open TCP socket.
-	_, err := p.Pool.Exec(ctx, "SELECT id FROM evidence_runs LIMIT 0")
+	_, err := p.Pool.Exec(ctx, "SELECT r.workspace_id, s.token_hash, f.id, d.workspace_id FROM evidence_runs r CROSS JOIN sessions s CROSS JOIN flow_definitions f CROSS JOIN contract_drafts d CROSS JOIN manual_recordings m LIMIT 0")
 	return err
 }
 
@@ -86,8 +109,11 @@ func scan(row pgx.Row) (Run, error) {
 	}
 	return r, err
 }
-func (p Postgres) List(ctx context.Context) ([]Run, error) {
-	rows, err := p.Pool.Query(ctx, "SELECT "+columns+" FROM evidence_runs ORDER BY created_at DESC, id DESC LIMIT 100")
+func (p Postgres) List(ctx context.Context, filter RunFilter) ([]Run, error) {
+	if WorkspaceID(ctx) == "" {
+		return nil, ErrForbidden
+	}
+	rows, err := p.Pool.Query(ctx, "SELECT "+columns+` FROM evidence_runs WHERE workspace_id=$1 AND ($2='' OR status=$2) AND ($3='' OR strpos(lower(title || ' ' || repository || ' ' || pull_request::text || ' ' || id || ' ' || head_sha),lower($3))>0) ORDER BY created_at DESC, id DESC LIMIT 100`, WorkspaceID(ctx), filter.Status, filter.Query)
 	if err != nil {
 		return nil, err
 	}
@@ -103,13 +129,16 @@ func (p Postgres) List(ctx context.Context) ([]Run, error) {
 	return runs, rows.Err()
 }
 func (p Postgres) Get(ctx context.Context, id string) (Run, error) {
-	return scan(p.Pool.QueryRow(ctx, "SELECT "+columns+" FROM evidence_runs WHERE id=$1", id))
+	if WorkspaceID(ctx) == "" {
+		return Run{}, ErrForbidden
+	}
+	return scan(p.Pool.QueryRow(ctx, "SELECT "+columns+" FROM evidence_runs WHERE id=$1 AND workspace_id=$2", id, WorkspaceID(ctx)))
 }
 
 // SeedSamples only inserts explicit demo records. Callers enforce a local DB guard.
 func SeedSamples(ctx context.Context, pool *pgxpool.Pool) error {
 	for _, r := range Samples() {
-		_, err := pool.Exec(ctx, `INSERT INTO evidence_runs (`+columns+`) VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12) ON CONFLICT (id) DO NOTHING`, r.ID, r.Repository, r.PullRequest, r.Title, r.HeadSHA, r.Status, r.Environment, r.CreatedAt, r.DurationSeconds, r.Flows, r.Assertions, r.NotCovered)
+		_, err := pool.Exec(ctx, `INSERT INTO evidence_runs (`+columns+`, workspace_id) VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12,'sample-workspace') ON CONFLICT (id) DO NOTHING`, r.ID, r.Repository, r.PullRequest, r.Title, r.HeadSHA, r.Status, r.Environment, r.CreatedAt, r.DurationSeconds, r.Flows, r.Assertions, r.NotCovered)
 		if err != nil {
 			return err
 		}

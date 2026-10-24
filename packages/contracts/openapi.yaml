@@ -1,8 +1,10 @@
 openapi: 3.1.0
 info:
   title: Exhibit API
-  version: 0.1.0
-  description: Private MVP foundation. Contract evaluation checks completeness only; it never authorizes execution.
+  version: 0.2.0
+  description: >-
+    Private workspace API. Authenticated metadata and contract completeness never authorize
+    execution. Demo sessions only read sample evidence and ephemeral settings.
 paths:
   /api/healthz:
     get:
@@ -10,6 +12,7 @@ paths:
       responses:
         '200':
           description: Process is alive
+      security: []
   /api/readyz:
     get:
       operationId: ready
@@ -18,12 +21,14 @@ paths:
           description: Store is reachable
         '503':
           description: Store is unavailable
+      security: []
   /api/version:
     get:
       operationId: version
       responses:
         '200':
           description: Build provenance
+      security: []
   /api/v1/runs:
     get:
       operationId: listRuns
@@ -34,8 +39,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RunList'
+        '400':
+          description: Invalid, unknown, repeated or oversized filter
+        '401':
+          description: Sign in required
         '503':
           $ref: '#/components/responses/Unavailable'
+      description: >-
+        Returns up to 100 matching workspace runs ordered by createdAt descending, then id
+        descending. Filters apply before LIMIT. Unknown and repeated parameters are rejected.
+      parameters:
+        - in: query
+          name: q
+          description: >-
+            Literal case-insensitive substring of title, repository, PR number, run ID or full SHA;
+            whitespace trimmed, maximum 200 UTF-8 bytes.
+          schema:
+            type: string
+            maxLength: 200
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum:
+              - queued
+              - running
+              - verified
+              - partial
+              - failed
+              - couldnt_run
   /api/v1/runs/{id}:
     get:
       operationId: getRun
@@ -43,7 +75,8 @@ paths:
         - in: path
           name: id
           required: true
-          schema: { type: string }
+          schema:
+            type: string
       responses:
         '200':
           description: Run details
@@ -51,6 +84,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Run'
+        '401':
+          description: Sign in required
         '404':
           description: Run does not exist
         '503':
@@ -73,6 +108,477 @@ paths:
                 $ref: '#/components/schemas/Evaluation'
         '400':
           description: Invalid or oversized JSON (64 KiB maximum)
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      description: Owner/editor only. Contract completeness is not execution authority.
+  /api/v1/auth/login:
+    post:
+      operationId: login
+      security: []
+      description: Private operator-provisioned account. Requires same-origin Origin header. Rate limited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Invalid input
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+        '429':
+          description: Rate limited; retry later
+        '503':
+          description: Store unavailable
+  /api/v1/auth/demo:
+    post:
+      operationId: startDemoSession
+      security: []
+      description: >-
+        Only available in demo mode; isolated ephemeral sample workspace. Requires same-origin
+        Origin header.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmptyObject'
+      responses:
+        '200':
+          description: Sample session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Invalid input
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+        '404':
+          description: Demo unavailable in real mode
+        '429':
+          description: Rate limited
+        '503':
+          description: Store unavailable
+  /api/v1/auth/session:
+    get:
+      operationId: getSession
+      responses:
+        '200':
+          description: Current session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Invalid input
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+        '503':
+          description: Store unavailable
+  /api/v1/auth/logout:
+    post:
+      operationId: logout
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmptyObject'
+      responses:
+        '200':
+          description: Session revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - signedOut
+                properties:
+                  signedOut:
+                    type: boolean
+        '400':
+          description: Invalid input
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+        '503':
+          description: Store unavailable
+  /api/v1/workspace:
+    get:
+      operationId: getWorkspace
+      responses:
+        '200':
+          description: Current workspace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+        '400':
+          description: Invalid input
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+        '503':
+          description: Store unavailable
+    patch:
+      operationId: renameWorkspace
+      description: Owner only
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceNameInput'
+      responses:
+        '200':
+          description: Saved workspace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+        '400':
+          description: Invalid input
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+        '503':
+          description: Store unavailable
+  /api/v1/setup:
+    get:
+      operationId: getSetup
+      responses:
+        '200':
+          description: Saved setup; empty strings indicate missing metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Setup'
+        '400':
+          description: Invalid input
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+        '503':
+          description: Store unavailable
+    put:
+      operationId: saveSetup
+      description: >-
+        Owner only. Saves preparation metadata, never an installation or run approval. Demo values
+        expire with the session.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Setup'
+      responses:
+        '200':
+          description: Saved metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Setup'
+        '400':
+          description: Invalid input
+        '401':
+          description: Sign in required
+        '403':
+          description: Permission or CSRF check failed
+        '503':
+          description: Store unavailable
+  /api/v1/flows:
+    get:
+      operationId: listFlows
+      description: >-
+        At most 100 authored flow definitions in this workspace, sorted by updatedAt then id
+        descending. Definitions are unapproved metadata, never execution authority.
+      responses:
+        '200':
+          description: Workspace flow catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlowList'
+        '400':
+          description: Invalid or oversized input
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Flow not found in this workspace
+        '503':
+          description: Preparation store unavailable
+    post:
+      operationId: createFlow
+      description: Owner/editor only; records actor and time. At most 100 definitions per workspace.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlowInput'
+      responses:
+        '201':
+          description: Saved authored flow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flow'
+        '400':
+          description: Invalid or oversized input
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Flow not found in this workspace
+        '409':
+          description: Workspace flow capacity reached
+        '503':
+          description: Preparation store unavailable
+  /api/v1/flows/{id}:
+    get:
+      operationId: getFlow
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Authored flow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flow'
+        '400':
+          description: Invalid or oversized input
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Flow not found in this workspace
+        '503':
+          description: Preparation store unavailable
+    patch:
+      operationId: updateFlow
+      description: >-
+        Owner/editor only. Supplied fields replace their current values; omitted fields remain
+        unchanged. No approval or verdict is set.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlowPatch'
+      responses:
+        '200':
+          description: Updated authored flow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flow'
+        '400':
+          description: Invalid or oversized input
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Flow not found in this workspace
+        '503':
+          description: Preparation store unavailable
+  /api/v1/contract-draft:
+    get:
+      operationId: getContractDraft
+      description: Workspace draft. An unsaved draft has blank strings, pullRequest 0, and empty flowIds.
+      responses:
+        '200':
+          description: Saved or empty draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractDraft'
+        '400':
+          description: Invalid or oversized input
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Flow not found in this workspace
+        '503':
+          description: Preparation store unavailable
+    put:
+      operationId: saveContractDraft
+      description: >-
+        Owner/editor only. Replaces the shared workspace draft; omitted fields become empty. Bounded
+        incomplete/invalid values can be saved for later evaluation. Actor and time are recorded;
+        this never authorizes execution.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvidenceContract'
+      responses:
+        '200':
+          description: Saved draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractDraft'
+        '400':
+          description: Invalid or oversized input
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Flow not found in this workspace
+        '503':
+          description: Preparation store unavailable
+  /api/v1/recordings:
+    get:
+      operationId: listRecordings
+      description: >-
+        Latest 100 workspace manual recording declarations, ordered by createdAt and id descending.
+        No media is stored or served.
+      responses:
+        '200':
+          description: Saved metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingList'
+        '400':
+          description: Invalid, oversized or forged metadata
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Recording or related run not found in this workspace
+        '503':
+          description: Metadata store unavailable
+    post:
+      operationId: createRecording
+      description: >-
+        Owner/editor only. Saves immutable declared metadata, not media bytes. A supplied SHA-256 is
+        unverified; the server fixes origin=manual, verification=unverified and mediaStored=false.
+        Related runs must belong to the same workspace. No run verdict is modified.
+      parameters:
+        - $ref: '#/components/parameters/CSRFToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordingInput'
+      responses:
+        '201':
+          description: Saved manual declaration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recording'
+        '400':
+          description: Invalid, oversized or forged metadata
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Recording or related run not found in this workspace
+        '409':
+          description: Workspace has reached 100 recording metadata records
+        '503':
+          description: Metadata store unavailable
+  /api/v1/recordings/{id}:
+    get:
+      operationId: getRecording
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Manual metadata; media remains local
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recording'
+        '400':
+          description: Invalid, oversized or forged metadata
+        '401':
+          description: Sign in required
+        '403':
+          description: Editor permission or CSRF check failed
+        '404':
+          description: Recording or related run not found in this workspace
+        '503':
+          description: Metadata store unavailable
+  /api/v1/activity:
+    get:
+      operationId: listActivity
+      description: >-
+        Latest 50 workspace flow, contract and recording authorship events. This is not an execution
+        or approval audit. No raw configuration contents are returned.
+      responses:
+        '200':
+          description: Recent preparation activity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityList'
+        '401':
+          description: Sign in required
+        '503':
+          description: Metadata store unavailable
 components:
   responses:
     Unavailable:
@@ -81,73 +587,658 @@ components:
     EvidenceContract:
       type: object
       additionalProperties: false
-      description: Fields are optional so the evaluator can report missing information.
+      description: >-
+        Optional bounded fields for completeness evaluation or draft saving. Semantic-invalid values
+        remain editable; all string limits are UTF-8 bytes and NUL is rejected. Supplied flow IDs
+        are not resolved or approved by this evaluator.
       properties:
-        repository: { type: string, example: acme/storefront }
-        pullRequest: { type: integer, minimum: 1 }
-        headSha: { type: string, pattern: '^[a-f0-9]{40}$' }
+        repository:
+          type: string
+          maxLength: 201
+          description: Expected owner/repository; invalid bounded values report needs_info
+        pullRequest:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+          description: 0 is incomplete
+        headSha:
+          type: string
+          maxLength: 100
+          description: Expected full lowercase 40-character SHA
         changeKind:
-          {
-            type: string,
-            enum: [frontend, backend, fullstack, docs, migration],
-          }
-        environment: { type: string, enum: [staging] }
-        flowIds: { type: array, items: { type: string }, minItems: 1 }
-        runbookRef: { type: string }
-        testTenant: { type: string }
+          type: string
+          maxLength: 32
+          description: frontend, backend, fullstack, docs or migration
+        environment:
+          type: string
+          maxLength: 32
+          description: Only staging is eligible; other nonempty values evaluate not_testable
+        flowIds:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 128
+        runbookRef:
+          type: string
+          maxLength: 512
+        testTenant:
+          type: string
+          maxLength: 100
     Evaluation:
       type: object
-      required: [state, missing, reason]
+      required:
+        - state
+        - missing
+        - reason
       properties:
-        state: { type: string, enum: [ready, needs_info, not_testable] }
-        missing: { type: array, items: { type: string } }
-        reason: { type: string }
+        state:
+          type: string
+          enum:
+            - ready
+            - needs_info
+            - not_testable
+        missing:
+          type: array
+          items:
+            type: string
+        reason:
+          type: string
     RunList:
       type: object
-      required: [mode, runs]
+      required:
+        - mode
+        - runs
       properties:
-        mode: { type: string, enum: [demo, postgres] }
-        runs: { type: array, items: { $ref: '#/components/schemas/Run' } }
+        mode:
+          type: string
+          enum:
+            - demo
+            - postgres
+        runs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Run'
     Run:
       type: object
       required:
-        [
-          id,
-          repository,
-          pullRequest,
-          title,
-          headSha,
-          status,
-          sample,
-          environment,
-          createdAt,
-          durationSeconds,
-          flows,
-          assertions,
-          notCovered,
-        ]
+        - id
+        - repository
+        - pullRequest
+        - title
+        - headSha
+        - status
+        - sample
+        - environment
+        - createdAt
+        - durationSeconds
+        - flows
+        - assertions
+        - notCovered
       properties:
-        id: { type: string }
-        repository: { type: string }
-        pullRequest: { type: integer }
-        title: { type: string }
-        headSha: { type: string }
+        id:
+          type: string
+        repository:
+          type: string
+        pullRequest:
+          type: integer
+        title:
+          type: string
+        headSha:
+          type: string
         status:
-          {
-            type: string,
-            enum: [queued, running, verified, partial, failed, couldnt_run],
-          }
-        sample: { type: boolean }
-        environment: { type: string }
-        createdAt: { type: string, format: date-time }
-        durationSeconds: { type: integer }
-        flows: { type: array, items: { type: string } }
+          type: string
+          enum:
+            - queued
+            - running
+            - verified
+            - partial
+            - failed
+            - couldnt_run
+        sample:
+          type: boolean
+        environment:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        durationSeconds:
+          type: integer
+        flows:
+          type: array
+          items:
+            type: string
         assertions:
           type: array
           items:
             type: object
-            required: [label, passed]
+            required:
+              - label
+              - passed
             properties:
-              label: { type: string }
-              passed: { type: boolean }
-        notCovered: { type: array, items: { type: string } }
+              label:
+                type: string
+              passed:
+                type: boolean
+        notCovered:
+          type: array
+          items:
+            type: string
+    EmptyObject:
+      type: object
+      additionalProperties: false
+    LoginInput:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          maxLength: 254
+        password:
+          type: string
+          maxLength: 256
+          writeOnly: true
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - name
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+    Workspace:
+      type: object
+      required:
+        - id
+        - name
+        - role
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum:
+            - owner
+            - editor
+            - viewer
+    Session:
+      type: object
+      required:
+        - user
+        - workspace
+        - mode
+        - csrfToken
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        workspace:
+          $ref: '#/components/schemas/Workspace'
+        mode:
+          type: string
+          enum:
+            - demo
+            - postgres
+        csrfToken:
+          type: string
+    WorkspaceNameInput:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+    Setup:
+      type: object
+      additionalProperties: false
+      required:
+        - repository
+        - stagingUrl
+        - testTenant
+        - runbookRef
+      properties:
+        repository:
+          type: string
+          description: owner/repository, or empty for incomplete setup
+        stagingUrl:
+          type: string
+          description: HTTPS URL without credentials, query or fragment; loopback HTTP allowed; may be empty
+        testTenant:
+          type: string
+          maxLength: 100
+        runbookRef:
+          type: string
+          maxLength: 512
+          description: path@full-lowercase-40-character-commit-SHA, or empty
+    FlowInput:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - description
+        - preconditions
+        - assertions
+        - cleanup
+        - runbookRef
+      description: Authored metadata only. All string limits are UTF-8 byte limits; NUL is rejected.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 2000
+        preconditions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        assertions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        cleanup:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        runbookRef:
+          type: string
+          minLength: 1
+          maxLength: 512
+          pattern: ^[^\s@]+@[0-9a-f]{40}$
+    FlowPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 2000
+        preconditions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        assertions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        cleanup:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        runbookRef:
+          type: string
+          minLength: 1
+          maxLength: 512
+          pattern: ^[^\s@]+@[0-9a-f]{40}$
+    Flow:
+      type: object
+      required:
+        - name
+        - description
+        - preconditions
+        - assertions
+        - cleanup
+        - runbookRef
+        - id
+        - updatedAt
+        - updatedBy
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 2000
+        preconditions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        assertions:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+        cleanup:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        runbookRef:
+          type: string
+          minLength: 1
+          maxLength: 512
+          pattern: ^[^\s@]+@[0-9a-f]{40}$
+        id:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        updatedBy:
+          type: string
+          description: Author user ID, not an approval
+    FlowList:
+      type: object
+      required:
+        - flows
+      properties:
+        flows:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/Flow'
+    ContractDraft:
+      type: object
+      additionalProperties: false
+      required:
+        - repository
+        - pullRequest
+        - headSha
+        - changeKind
+        - environment
+        - flowIds
+        - runbookRef
+        - testTenant
+      description: >-
+        Workspace-shared draft with empty defaults. Authorship is recorded separately; content does
+        not grant execution authority.
+      properties:
+        repository:
+          type: string
+          maxLength: 201
+          description: Expected owner/repository; invalid bounded values report needs_info
+        pullRequest:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+          description: 0 is incomplete
+        headSha:
+          type: string
+          maxLength: 100
+          description: Expected full lowercase 40-character SHA
+        changeKind:
+          type: string
+          maxLength: 32
+          description: frontend, backend, fullstack, docs or migration
+        environment:
+          type: string
+          maxLength: 32
+          description: Only staging is eligible; other nonempty values evaluate not_testable
+        flowIds:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 128
+        runbookRef:
+          type: string
+          maxLength: 512
+        testTenant:
+          type: string
+          maxLength: 100
+    RecordingChapter:
+      type: object
+      additionalProperties: false
+      required:
+        - label
+        - atSeconds
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 120
+        atSeconds:
+          type: number
+          minimum: 0
+          maximum: 3600
+          description: Must be within the recording duration
+    RecordingPresentation:
+      type: object
+      additionalProperties: false
+      required:
+        - frame
+        - zoom
+        - playbackRate
+      properties:
+        frame:
+          type: string
+          enum:
+            - paper
+            - mist
+            - slate
+        zoom:
+          type: number
+          minimum: 1
+          maximum: 2
+        playbackRate:
+          type: number
+          minimum: 0.5
+          maximum: 2
+    RecordingInput:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - fileName
+        - sha256
+        - bytes
+        - mediaType
+        - durationSeconds
+        - runId
+        - chapters
+        - presentation
+      description: >-
+        Manual media declaration. No bytes are uploaded. UTF-8 byte limits apply to strings; NUL is
+        rejected. All numeric values must be finite.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        fileName:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: A filename without path separators or control characters
+        sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Client-declared checksum; the server has no media bytes to verify it
+        bytes:
+          type: integer
+          minimum: 1
+          maximum: 134217728
+        mediaType:
+          type: string
+          enum:
+            - video/webm
+            - video/mp4
+        durationSeconds:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 3600
+        runId:
+          type: string
+          maxLength: 128
+          description: Related workspace run ID; empty means unattached
+        chapters:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/RecordingChapter'
+        presentation:
+          $ref: '#/components/schemas/RecordingPresentation'
+    Recording:
+      type: object
+      required:
+        - name
+        - fileName
+        - sha256
+        - bytes
+        - mediaType
+        - durationSeconds
+        - runId
+        - chapters
+        - presentation
+        - id
+        - origin
+        - verification
+        - mediaStored
+        - createdAt
+        - createdBy
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        fileName:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: A filename without path separators or control characters
+        sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+          description: Client-declared checksum; the server has no media bytes to verify it
+        bytes:
+          type: integer
+          minimum: 1
+          maximum: 134217728
+        mediaType:
+          type: string
+          enum:
+            - video/webm
+            - video/mp4
+        durationSeconds:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 3600
+        runId:
+          type: string
+          maxLength: 128
+          description: Related workspace run ID; empty means unattached
+        chapters:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/RecordingChapter'
+        presentation:
+          $ref: '#/components/schemas/RecordingPresentation'
+        id:
+          type: string
+        origin:
+          type: string
+          enum:
+            - manual
+        verification:
+          type: string
+          enum:
+            - unverified
+        mediaStored:
+          type: boolean
+          enum:
+            - false
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          description: Author user ID
+    RecordingList:
+      type: object
+      required:
+        - recordings
+      properties:
+        recordings:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/Recording'
+    Activity:
+      type: object
+      required:
+        - id
+        - action
+        - objectId
+        - actorId
+        - createdAt
+      properties:
+        id:
+          type: string
+        action:
+          type: string
+          enum:
+            - flow.created
+            - flow.updated
+            - contract.saved
+            - recording.created
+        objectId:
+          type: string
+        actorId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    ActivityList:
+      type: object
+      required:
+        - events
+      properties:
+        events:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/Activity'
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: exhibit_session
+  parameters:
+    CSRFToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      description: Session CSRF token; mutations also require same-origin Origin header.
+      schema:
+        type: string
+security:
+  - sessionCookie: []

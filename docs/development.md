@@ -18,6 +18,13 @@ in `.env` and restart dev. Each checkout owns a Compose project and named volume
 the host binding is loopback-only. The seed CLI refuses non-loopback URLs. The migration
 CLI only touches Exhibit's database; verify `DATABASE_URL` before invoking it elsewhere.
 
+Database mode requires a privately provisioned account; follow the
+[workspace guide](workspace-guide.md). Local HTTP needs `EXHIBIT_COOKIE_SECURE=false`.
+New checkout environments include that setting; older `.env` files must add it or
+supply it when starting dev. Seeded sample records belong to an unclaimed sample
+workspace and are never automatically granted to a newly provisioned owner. Use
+the explicit demo-mode sample session when exploring fixtures.
+
 `make test-integration` creates a uniquely named schema, tests migration idempotence,
 checksum drift, sample seeding and API reads, then drops only that test schema. Its
 DB user needs schema creation permission. A crashed test may leave an `exhibit_test_*`

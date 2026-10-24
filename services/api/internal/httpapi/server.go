@@ -18,9 +18,12 @@ import (
 )
 
 type Server struct {
-	Store     store.Store
-	CommitSHA string
-	StaticDir string
+	Store         store.Store
+	CommitSHA     string
+	StaticDir     string
+	Identity      store.IdentityStore
+	SecureCookies bool
+	PublicOrigin  string
 }
 
 func respond(w http.ResponseWriter, status int, body any) {
@@ -32,7 +35,13 @@ func failure(w http.ResponseWriter, status int, message string) {
 	respond(w, status, map[string]string{"error": message})
 }
 func (s Server) Handler() http.Handler {
+	if s.Identity == nil && s.Store.Mode() == "demo" {
+		s.Identity = store.NewMemoryIdentity()
+	}
 	mux := http.NewServeMux()
+	s.registerIdentity(mux)
+	s.registerPreparation(mux)
+	s.registerRecordings(mux)
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, map[string]string{"status": "ok"}) })
 	mux.HandleFunc("GET /api/readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
@@ -47,7 +56,11 @@ func (s Server) Handler() http.Handler {
 		respond(w, 200, map[string]string{"application": "exhibit", "version": "0.1.0", "commitSha": s.CommitSHA})
 	})
 	mux.HandleFunc("GET /api/v1/runs", func(w http.ResponseWriter, r *http.Request) {
-		runs, err := s.Store.List(r.Context())
+		filter, ok := runFilter(w, r)
+		if !ok {
+			return
+		}
+		runs, err := s.Store.List(r.Context(), filter)
 		if err != nil {
 			slog.Error("list runs failed", "error", err)
 			failure(w, 503, "evidence store unavailable")
@@ -72,6 +85,9 @@ func (s Server) Handler() http.Handler {
 		respond(w, 200, run)
 	})
 	mux.HandleFunc("POST /api/v1/contracts/evaluate", func(w http.ResponseWriter, r *http.Request) {
+		if !editor(w, r) {
+			return
+		}
 		mediaType, _, mediaErr := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		if mediaErr != nil || mediaType != "application/json" {
 			failure(w, 400, "Content-Type must be application/json")
@@ -87,6 +103,10 @@ func (s Server) Handler() http.Handler {
 		}
 		if err := decoder.Decode(&struct{}{}); err != io.EOF {
 			failure(w, 400, "expected one JSON object")
+			return
+		}
+		if err := evidence.ValidateDraft(*contract); err != nil {
+			failure(w, 400, err.Error())
 			return
 		}
 		respond(w, 200, evidence.Evaluate(*contract))
@@ -110,15 +130,16 @@ func (s Server) Handler() http.Handler {
 			files.ServeHTTP(w, r)
 		})
 	}
+	protected := s.authenticated(mux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "same-origin")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			w.Header().Set("Cache-Control", "no-store")
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
-		mux.ServeHTTP(w, r.WithContext(ctx))
+		protected.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

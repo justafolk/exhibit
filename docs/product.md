@@ -18,10 +18,23 @@ knowledge ingestion, linked multi-repo PRs and general autonomous testing are de
 Avoid pricing commitments until real run-cost data exists. Set explicit per-run model,
 wall-time and sandbox budgets before any paid execution is enabled.
 
+## Current workspace
+
+The light-mode workspace provides private account sign-in, server-enforced workspace
+roles, isolated sample exploration, overview and run reports, and persistent repository
+and staging setup. Flow definitions and contract drafts make evidence preparation reusable;
+URL-preserved search and qualified Markdown exports support review. Owners are provisioned through a trusted CLI; public registration,
+email recovery and GitHub OAuth are not implemented. Setup records metadata without
+claiming GitHub connectivity, runbook approval or permission to execute.
+
+The recording studio captures or imports local video and adds chapters and presentation
+controls without altering original bytes. Workspace manifests remain manual and unverified;
+media is not uploaded. Neither recordings nor contract readiness can set a run verdict.
+
 ## Foundation acceptance
 
 A new contributor can clone, bootstrap and run a clearly labelled sample dashboard.
-The UI can read actual PostgreSQL rows and evaluate an evidence contract. Browser tests
+The API can read tenant-scoped PostgreSQL rows and evaluate an evidence contract. Browser tests
 exercise the Go API. New agent worktrees do not share a database or local ports.
 All of those capabilities ship in this initial setup.
 
@@ -39,7 +52,7 @@ all attempts must be visible. Artifacts are not currently captured or served.
 
 ## Next deliverable
 
-Complete the first three backlog milestones in order: trusted GitHub ingress, durable
+Complete the remaining work in the first three backlog milestones in order: trusted GitHub ingress, durable
 run scheduling and isolated execution, then artifact integrity and reporting. Gate a
-customer pilot on authentication, secrets isolation and cleanup recovery. Ship one
+customer pilot on identity operations, secrets isolation and cleanup recovery. Ship one
 flow end to end before automating catalog discovery.

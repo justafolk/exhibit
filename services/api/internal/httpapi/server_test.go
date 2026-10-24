@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,7 @@ import (
 
 func TestRoutes(t *testing.T) {
 	h := Server{Store: store.Demo{}, CommitSHA: "test"}.Handler()
+	cookie, session := demoLogin(t, h)
 	for _, tt := range []struct {
 		method, path, body string
 		status             int
@@ -37,6 +39,9 @@ func TestRoutes(t *testing.T) {
 		t.Run(tt.path+tt.body[:min(len(tt.body), 20)], func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Origin", "http://example.com")
+			req.Header.Set("X-CSRF-Token", session.CSRFToken)
+			req.AddCookie(cookie)
 			rec := httptest.NewRecorder()
 			h.ServeHTTP(rec, req)
 			if rec.Code != tt.status || !strings.Contains(rec.Body.String(), tt.contains) {
@@ -52,14 +57,17 @@ func TestRoutes(t *testing.T) {
 type failingStore struct{ store.Demo }
 
 func (failingStore) Ping(context.Context) error { return errors.New("password=never-leak") }
-func (failingStore) List(context.Context) ([]store.Run, error) {
+func (failingStore) List(context.Context, store.RunFilter) ([]store.Run, error) {
 	return nil, errors.New("internal failure")
 }
 func TestUnavailableStore(t *testing.T) {
 	h := Server{Store: failingStore{}}.Handler()
+	cookie, _ := demoLogin(t, h)
 	for _, path := range []string{"/api/readyz", "/api/v1/runs"} {
 		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.AddCookie(cookie)
+		h.ServeHTTP(rec, req)
 		if rec.Code != 503 || strings.Contains(rec.Body.String(), "password") {
 			t.Fatalf("unsafe failure: %d %s", rec.Code, rec.Body)
 		}
@@ -85,4 +93,25 @@ func TestStaticAndAPIRoutesCoexist(t *testing.T) {
 			t.Fatalf("%s %s: got %d want %d", tt.method, tt.path, rec.Code, tt.status)
 		}
 	}
+}
+
+func demoLogin(t *testing.T, h http.Handler) (*http.Cookie, Session) {
+	t.Helper()
+	req := httptest.NewRequest("POST", "/api/v1/auth/demo", strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "http://example.com")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("demo login: %d %s", rec.Code, rec.Body)
+	}
+	var session Session
+	if err := json.Unmarshal(rec.Body.Bytes(), &session); err != nil {
+		t.Fatal(err)
+	}
+	cookies := rec.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatalf("expected one cookie, got %d", len(cookies))
+	}
+	return cookies[0], session
 }

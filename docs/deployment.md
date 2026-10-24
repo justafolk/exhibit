@@ -2,8 +2,9 @@
 
 The cheapest useful starting topology is **one small Linux VM, one Exhibit app container,
 and PostgreSQL on the same VM**. Go serves the static frontend, so there is no second
-web server or paid frontend runtime. Keep the API private until user/tenant authentication
-is implemented. Expose a pilot through a TLS, identity-aware reverse proxy; binding the
+web server or paid frontend runtime. The API has private workspace authentication;
+keep it private while identity recovery and execution controls mature. Expose a pilot
+through a TLS, identity-aware reverse proxy; binding the
 Compose port to loopback is intentional.
 
 A practical planning budget is roughly **€6–12/month for the control plane**, plus tax,
@@ -35,6 +36,8 @@ script starts a temporary, loopback-bound demo container and always stops it.
 Create an environment file **outside this repository**, using
 `infra/.env.production.example` as the key reference. Use a strong URL-safe database
 password and the actual commit SHA. The example password is not safe to deploy.
+Set `EXHIBIT_PUBLIC_ORIGIN` to the exact HTTPS origin users will open. The deployment
+keeps Secure session cookies enabled and rejects mutations from other origins.
 
 ```sh
 docker compose --env-file /secure/exhibit.env -f infra/compose.mvp.yaml up -d --wait postgres
@@ -42,6 +45,13 @@ docker compose --env-file /secure/exhibit.env -f infra/compose.mvp.yaml run --rm
 docker compose --env-file /secure/exhibit.env -f infra/compose.mvp.yaml up -d app
 curl --fail http://127.0.0.1:8080/api/readyz
 ```
+
+Before the first sign-in, provision an owner through the trusted operator connection.
+The image includes `/app/bootstrap-user`; pipe a password from a secure prompt to
+`docker compose ... run --rm -T --no-deps --entrypoint /app/bootstrap-user app
+--email owner@example.com --name 'Owner' --workspace 'My workspace' --password-stdin`.
+Do not put passwords in command arguments. The [workspace guide](workspace-guide.md)
+shows the equivalent local command. No default credentials or public sign-up exist.
 
 The app uses an unprivileged user, read-only root filesystem, dropped capabilities and
 no Docker socket. The database has no host port in this topology. Expose only the proxy,
@@ -59,5 +69,30 @@ initial Compose role is an owner for convenience and should not be reused as a s
 6. Monitor database disk/backup age, API errors and latency. Once execution exists, also
    monitor lease expiry, cleanup failures, artifact retention and run cost.
 
-The scaffold supplies topology and build files, not a provisioned service, authentication,
-automated backups or a runner. Do not run unreviewed PR code on the control-plane VM.
+The repository supplies topology, build files and private workspace authentication,
+not a provisioned service, automated backups or an isolated runner. Do not run
+unreviewed PR code on the control-plane VM.
+
+## Render sample preview
+
+The root `render.yaml` deploys the tested `agent/studio-handoff` branch as a Docker
+web service on the free plan, serving both the React app and Go API. It explicitly
+uses `EXHIBIT_STORE=demo`; no database, private accounts, staging credentials, or
+customer execution are provisioned. Sample edits are session-local and are lost
+when the service restarts. Render may suspend idle free services.
+
+Create a Blueprint from this repository and select `agent/studio-handoff`. Grant
+Render's GitHub App access to this private repository if required. The Blueprint
+uses `/api/readyz` as its health check and disables automatic deployments.
+After Render reports the service live, open its HTTPS URL and choose
+**Explore sample workspace**. Confirm `/api/version` and exercise a saved flow,
+contract evaluation, and metadata save before considering the preview ready.
+
+Secure cookies are enabled. The server validates browser mutation origins against
+its HTTPS request host when `EXHIBIT_PUBLIC_ORIGIN` is unset. If using a custom
+proxy that changes the host, set `EXHIBIT_PUBLIC_ORIGIN` to the exact browser-facing
+HTTPS origin. Never turn off cookie security to work around a proxy mismatch.
+
+This configuration is a sample preview. A durable private deployment requires
+PostgreSQL, explicit migrations, owner provisioning, and restricted access as
+described above. This Blueprint has not itself been deployed or remotely verified.

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "sample": true,
+  "runId": "sample-artifact-integrity",
+  "attempt": 1,
+  "repository": "acme/storefront",
+  "pullRequest": 42,
+  "headSha": "0123456789abcdef0123456789abcdef01234567",
+  "flowId": "checkout.saved-address",
+  "flowRevision": "0123456789abcdef0123456789abcdef01234567",
+  "startedAt": "2026-01-01T10:00:00Z",
+  "finishedAt": "2026-01-01T10:00:04Z",
+  "origin": "manual",
+  "termination": "couldnt_run",
+  "assertions": [
+    {
+      "id": "confirmation-visible",
+      "label": "Order confirmation is visible",
+      "status": "skipped"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "sample-note.txt",
+      "sha256": "1de83d68a45fc354f9bd8ad78dd1a8914ec20fdbd1f078c329d531c29cffa40b",
+      "bytes": 77,
+      "mediaType": "text/plain"
+    }
+  ],
+  "notCovered": [
+    "Illustrative fixture only; no browser or staging flow was executed",
+    "Production payments and real email delivery"
+  ],
+  "cleanup": {
+    "status": "not_needed",
+    "details": "This sample did not create staging data"
+  }
+}

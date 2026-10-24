@@ -2,8 +2,12 @@
 
 ## 1. Trusted GitHub ingress and identities
 
-Implement installation/account records, user/tenant authentication and authorization,
-HMAC webhook validation, replay/idempotency handling and authoritative head-SHA resolution.
+Delivered: private owner provisioning, password sessions, workspace roles, tenant-scoped
+reads and writes, CSRF checks, and signed-delivery/trigger-policy helper tests.
+The workspace also supports persisted setup, authored flows and contract drafts.
+
+Remaining: installation/account records, operational identity recovery, a mounted webhook
+receiver, durable replay/idempotency handling and authoritative GitHub head-SHA resolution.
 Handle only explicit eligible triggers. Reject forks/untrusted actors by policy.
 Acceptance: invalid signatures cannot enqueue; duplicate deliveries create one event;
 installation boundaries cannot leak records; stale SHAs are rejected or visibly superseded.
@@ -17,6 +21,10 @@ Acceptance: a crashed worker is reconciled; no secrets reach forks or unapproved
 no PR code runs on the control-plane host; cleanup is idempotent and failures are recorded.
 
 ## 3. Deterministic evidence and PR reporting
+
+Available foundation: qualified Markdown report exports and local request/manifest/hash
+validation, plus an optional GitHub Actions workflow recording Exhibit's own sample tests.
+These cannot certify customer execution or independently establish provenance/redaction.
 
 Use Playwright assertions, recording/trace capture and an independent trusted collector.
 Upload redacted artifacts to private expiring object storage, verify hashes/provenance,

@@ -1,8 +1,19 @@
 # Trust boundaries
 
 The current foundation is for local development or private access behind a trusted proxy.
-It does not implement login, organization isolation, GitHub webhook ingress, secret storage,
-job execution or a public artifact service. Treat these as pilot prerequisites.
+It implements privately provisioned password login, expiring/revocable sessions,
+workspace-scoped reads and server-enforced roles. It does not implement public account
+recovery, GitHub webhook ingress, secret storage, job execution or a public artifact
+service. Treat the remaining operational controls as pilot prerequisites.
+
+Passwords use salted PBKDF2-SHA256; only session-token hashes are persisted. Cookies
+are HttpOnly and SameSite=Strict. PostgreSQL deployments default to Secure cookies;
+local HTTP development must explicitly disable that setting. Mutations check an exact
+origin and session-bound CSRF token. Behind a TLS proxy, set `EXHIBIT_PUBLIC_ORIGIN`
+to the public origin. Sign-in has a bounded per-source rate limit and hashing concurrency;
+forwarded client-IP headers are not trusted, so a proxy's clients share its source budget.
+Provisioning creates a new workspace and never adopts legacy or another tenant's records.
+Role changes take effect on the next authenticated database request.
 
 The contract evaluator consumes untrusted metadata and performs no execution. `ready`
 is a completeness result only. Future authorization must derive installation, actor,
