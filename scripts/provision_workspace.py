@@ -40,7 +40,7 @@ def request(url, method='GET', data=None, headers=None, opener=None):
     req = urllib.request.Request(url, data=raw, method=method,
                                  headers={'Content-Type': 'application/json', **(headers or {})})
     try:
-        with (opener or urllib.request).open(req, timeout=45) as response:
+        with (opener.open if opener else urllib.request.urlopen)(req, timeout=45) as response:
             body = response.read()
             return json.loads(body) if body else None
     except (urllib.error.URLError, ValueError):
