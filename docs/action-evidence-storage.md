@@ -37,7 +37,9 @@ For an existing Render workspace, run **Actions → Deploy Exhibit workspace** o
 temporary runner-only database access rule, attaches/reuses the artifact disk,
 deploys the exact main SHA, and checks live version, readiness and ingestion
 authentication. Existing accounts and the database connection remain unchanged.
-The merged Starter/10 GB disk configuration is applied when needed.
+If the service is currently Free, first select Starter in the Render dashboard:
+Render's API refuses changes between free and paid plans. The workflow checks this
+before making deployment changes. It creates the merged 10 GB disk when missing.
 
 Do not rerun the account-provisioning workflow to deploy an existing account: it
 intentionally refuses to overwrite owners. Use the existing operator path for
