@@ -13,6 +13,9 @@ inputs:
   manifest-path:
     description: Output manifest path; Markdown uses the same stem (collect mode)
     default: .local/evidence/manifest.json
+  require-video:
+    description: Fail collection when no nonempty video artifact was recorded
+    default: 'true'
 outputs:
   eligible:
     description: Whether this event should run the sample evidence tests
@@ -30,5 +33,6 @@ runs:
         EVIDENCE_MODE: ${{ inputs.mode }}
         PLAYWRIGHT_JSON: ${{ inputs.playwright-json }}
         ARTIFACT_ROOT: ${{ inputs.artifact-root }}
+        REQUIRE_VIDEO: ${{ inputs.require-video }}
         MANIFEST_PATH: ${{ inputs.manifest-path }}
       run: python3 "$EXHIBIT_ACTION_PATH/../../../scripts/pr_evidence.py" "$EVIDENCE_MODE"
