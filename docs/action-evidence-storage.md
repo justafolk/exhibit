@@ -32,6 +32,13 @@ real workspaces do not substitute the bundled gallery for missing uploads.
 5. Set the repository Actions variable `EXHIBIT_INGEST_URL` to
    `https://exhibit-sample.onrender.com` (no `/#/overview` suffix).
 
+For an existing Render workspace, run **Actions → Deploy Exhibit workspace** on
+`main`. It uses the existing `RENDER_API_KEY` secret, applies migrations with a
+temporary runner-only database access rule, attaches/reuses the artifact disk,
+deploys the exact main SHA, and checks live version, readiness and ingestion
+authentication. Existing accounts and the database connection remain unchanged.
+The merged Starter/10 GB disk configuration is applied when needed.
+
 Do not rerun the account-provisioning workflow to deploy an existing account: it
 intentionally refuses to overwrite owners. Use the existing operator path for
 migrations and a normal service deploy. The blueprint changes describe the desired
