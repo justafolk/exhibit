@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect Exhibit's own Playwright output into an unverified self-test manifest.
+"""Collect secret-free sample Playwright output into an unverified self-test manifest.
 
 Only use on the isolated, secret-free sample test workflow. This does not redact
 files or establish trusted provenance. Nothing is uploaded by this script.
@@ -24,13 +24,18 @@ def collect_tests(suites):
         for spec in suite.get("specs", []):
             for test in spec.get("tests", []):
                 status = test.get("status")
-                outcome = "passed" if status == "expected" else "skipped" if status == "skipped" else "failed"
+                if status not in ("expected", "skipped"):
+                    outcome = "failed"
+                elif status == "skipped" or test.get("expectedStatus", "passed") != "passed":
+                    outcome = "skipped"
+                else:
+                    outcome = "passed"
                 label = f"Browser test: {spec.get('title', 'Unnamed browser test')} ({test.get('projectName', 'default')})"
                 assertions.append({"id": "pending", "label": label, "status": outcome})
     return assertions
 
 
-def capture(playwright, root, repository, sha, run_id, attempt):
+def capture(playwright, root, repository, sha, run_id, attempt, *, pull_request=None, flow_id="exhibit.browser-self-test"):
     require(type(playwright) is dict, "Playwright report must be an object")
     config = playwright.get("config")
     require(type(config) is dict and type(config.get("metadata")) is dict,
@@ -73,13 +78,13 @@ def capture(playwright, root, repository, sha, run_id, attempt):
             while block := source.read(1024 * 1024):
                 digest.update(block)
         artifacts.append({"path": path.relative_to(root).as_posix(), "sha256": digest.hexdigest(), "bytes": size, "mediaType": MEDIA[path.suffix]})
-    gaps = ["Exhibit sample-mode self-test only; no customer PR or staging environment was executed",
+    gaps = ["Secret-free sample PR browser tests only; no deployed staging or production was exercised" if pull_request is not None else "Exhibit sample-mode self-test only; no customer PR or staging environment was executed",
             "Collector identity, artifact redaction and execution provenance are not independently verified"]
     if not any(a["mediaType"].startswith("video/") for a in artifacts):
         gaps.append("No video artifact was produced")
     manifest = {"schemaVersion": 1, "sample": True, "runId": run_id, "attempt": attempt,
-                "repository": repository, "pullRequest": None, "headSha": sha,
-                "flowId": "exhibit.browser-self-test", "flowRevision": sha,
+                "repository": repository, "pullRequest": pull_request, "headSha": sha,
+                "flowId": flow_id, "flowRevision": sha,
                 "startedAt": started.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
                 "finishedAt": finished.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
                 "origin": "self_test", "termination": "failed" if errors or any(a["status"] == "failed" for a in assertions) else "completed" if assertions else "couldnt_run",
