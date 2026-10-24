@@ -58,7 +58,6 @@ export async function digest(blob: Blob) {
 export function inspectVideo(
   url: string,
   signal: AbortSignal,
-  captureDuration?: number,
 ): Promise<{ durationSeconds: number; width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
@@ -93,7 +92,9 @@ export function inspectVideo(
       if (settled) return;
       if (Number.isFinite(video.duration) && video.duration > 0)
         discovered = video.duration;
-      const duration = captureDuration || discovered;
+      // Capture wall time includes encoder/stop delays and cannot bound chapters.
+      // Require a duration read from the playable bytes for captures and imports.
+      const duration = discovered;
       if (duration > MAX_DURATION_SECONDS) {
         fail(
           new Error(
@@ -137,12 +138,7 @@ export function inspectVideo(
         return;
       }
       finish();
-      if (
-        !settled &&
-        !captureDuration &&
-        !Number.isFinite(video.duration) &&
-        !seekingEnd
-      ) {
+      if (!settled && !Number.isFinite(video.duration) && !seekingEnd) {
         seekingEnd = true;
         try {
           video.currentTime = 86400;

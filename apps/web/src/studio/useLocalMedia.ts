@@ -58,7 +58,6 @@ export function useLocalMedia() {
     blob: Blob,
     fileName: string,
     source: LocalMedia['source'],
-    captureDuration?: number,
   ) {
     const token = ++generation.current;
     abortRef.current?.abort();
@@ -71,7 +70,7 @@ export function useLocalMedia() {
       const mediaType = checkMedia(blob, fileName);
       url = URL.createObjectURL(blob);
       const [info, sha256] = await Promise.all([
-        inspectVideo(url, controller.signal, captureDuration),
+        inspectVideo(url, controller.signal),
         digest(blob),
       ]);
       if (!alive.current || token !== generation.current) {
@@ -183,7 +182,6 @@ export function useLocalMedia() {
         stopRecording();
       };
       recorder.onstop = () => {
-        const durationSeconds = (performance.now() - started) / 1000;
         clearTimers();
         stopTracks();
         recorderRef.current = undefined;
@@ -193,12 +191,7 @@ export function useLocalMedia() {
           const type = recorder.mimeType.split(';')[0];
           const extension = type === 'video/mp4' ? 'mp4' : 'webm';
           const fileName = `exhibit-capture-${new Date().toISOString().replace(/[:.]/g, '-')}.${extension}`;
-          void prepare(
-            new Blob(chunks, { type }),
-            fileName,
-            'capture',
-            durationSeconds,
-          );
+          void prepare(new Blob(chunks, { type }), fileName, 'capture');
         }
       };
       selected.getVideoTracks().forEach((track) => {

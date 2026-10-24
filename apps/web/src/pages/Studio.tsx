@@ -76,7 +76,14 @@ export function Studio({
     client
       .listRecordings()
       .then((result) => {
-        if (active) setRecordings(result.recordings);
+        if (active)
+          setRecordings((items) => {
+            const listedIds = new Set(result.recordings.map((item) => item.id));
+            return [
+              ...(items || []).filter((item) => !listedIds.has(item.id)),
+              ...result.recordings,
+            ].slice(0, 100);
+          });
       })
       .catch((reason) => {
         if (active) setListError(message(reason));
