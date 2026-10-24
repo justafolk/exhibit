@@ -1,4 +1,4 @@
-FROM node:22-alpine AS web
+FROM node:25-alpine AS web
 WORKDIR /src
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/package.json
