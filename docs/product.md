@@ -55,7 +55,24 @@ those facts from trusted sources.
 Sample `verified` runs are educational fixtures, visibly labelled. A real verdict must
 be derived from deterministic assertions and immutable artifacts, bound to the head SHA.
 A model narrative cannot set a successful verdict. Failed boot, skipped coverage and
-all attempts must be visible. Artifacts are not currently captured or served.
+all attempts must be visible.
+
+The sample Actions integration captures and hashes frontend/API artifacts, and the
+review workspace serves a curated playable snapshot. Authenticated live ingestion and
+private artifact delivery for arbitrary customer runs remain unimplemented.
+
+## Demonstrated sample integration
+
+The `agent-test` GitHub Actions flow in `justafolk/sample-project-exhibit` now records
+frontend browser tests, collects backend JUnit results with clean-start provenance,
+hashes artifacts and runs isolated Codex CLI advice. It posts account-verified start
+and completion comments, with animated previews and links to the full videos and
+HTML/Markdown/JSON report. It is limited to same-repository, non-draft sample PRs;
+the code rejects stale head/attempt data and does not promote advice to a verified verdict.
+This is separate from the future GitHub App/orchestrator and hosted workspace ingestion.
+
+See [the hackathon review guide](hackathon.md) for source paths, an observed successful
+run and the distinction between the bundled dashboard snapshot and newer CI evidence.
 
 ## Next deliverable
 

@@ -2,10 +2,20 @@
 
 **Review the evidence. Ship with confidence.**
 
-Exhibit is a PR evidence platform: run a reviewed flow against staging dependencies,
-then attach deterministic assertions, provenance and recordings to the exact commit.
-This repository is the runnable workspace application, with a light-mode React interface
-and a Go/PostgreSQL control plane. Customer execution remains a separate integration.
+**Commit-linked video and API evidence for AI-authored pull requests.**
+
+AI tools help teams produce code quickly. Maintainers still need to inspect what the
+change actually does. Exhibit brings frontend recordings, backend test results and
+Codex-assisted review into the pull request, with the tested commit and coverage gaps
+kept visible.
+
+Built for the **Developer Tools** theme at the **DevDay Exchange Community Metro
+Hackathon Pune, 24 October 2026**. The prototype includes a React/TypeScript review
+workspace, a Go/PostgreSQL control plane and a working sample GitHub Actions integration.
+General customer staging execution and hosted artifact ingestion remain future work.
+
+**Review the project:** [three-minute demo, criteria map and evidence](docs/hackathon.md).
+The guide links implemented features to source, tests and a completed CI run.
 
 ## Start locally
 
@@ -61,13 +71,20 @@ to the same canonical guidance.
 - Explicit sample mode or PostgreSQL run reads; readiness and build-provenance endpoints.
 - Checked migrations, local sample seeding, shared OpenAPI and generated client types.
 - Unit, race, database, browser, format, type and container checks in GitHub Actions.
-- Agent request/manifest validation, checksum checks and optional sample browser recordings in CI.
+- Playable curated frontend recordings and a separate API/cURL evidence explorer, with original downloads and source hashes.
+- Opt-in `agent-test` sample PR workflow: real backend API results, frontend videos/traces, clean-commit provenance and checksums.
+- Isolated Codex CLI review of evidence metadata, with advisory HTML/Markdown/JSON reports.
+- Account-verified start/report PR comments, animated recording previews and full-resolution artifact links.
+- Agent request/manifest validation and local automatic sample recording.
 - Agent context, flow/runbook examples, task handoffs and worktree automation.
 
-**Not implemented yet:** live GitHub App installation/webhook ingress, public identity recovery,
-isolated customer execution, agent SDK execution, trusted artifact upload/redaction, and posting evidence
-to PRs. The UI does not fabricate working integrations. Start with the ordered
-[backlog](agents/backlog.md); the foundation is not a public multi-tenant service.
+**Prototype boundary:** the working Actions integration is scoped to the sample repository;
+the dashboard's bundled gallery is a curated snapshot, not live CI ingestion. General GitHub
+App installation/webhook ingress, public identity recovery, isolated customer staging
+execution, private artifact ingestion/redaction and independently trusted verdicts are
+not implemented. Passing tests and Codex advice do not certify a customer change.
+See the [criteria and evidence guide](docs/hackathon.md#current-boundaries) and
+[backlog](agents/backlog.md) for the current scope.
 
 ## Repository layout
 
@@ -89,8 +106,10 @@ docs/                 Product, architecture, development and deployment
 After committing a change, run `npm run evidence:record` from this repository. It
 records the sample browser suite and returns a local bundle with videos, traces,
 checksums and an unverified report. No screen-sharing steps or dashboard forms are
-required. Dependencies and Chromium must be installed. This is a repository self-test;
-customer execution, hosted ingestion and PR publishing are not connected yet.
+required. Dependencies and Chromium must be installed. This command is a local repository
+self-test. The separate sample GitHub Actions workflow captures frontend/API evidence,
+runs advisory Codex review and publishes PR comments; it is not a general customer
+execution or hosted-ingestion service. See [the demonstrated flow](docs/hackathon.md#recorded-end-to-end-evidence).
 
 See [agent experience and feature research](docs/agent-experience.md).
 
