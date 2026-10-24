@@ -1,0 +1,19 @@
+# Browsable sample workspace. No database, credentials, or customer execution.
+services:
+  - type: web
+    name: exhibit-sample
+    runtime: docker
+    repo: https://github.com/justafolk/exhibit
+    branch: agent/studio-handoff
+    plan: free
+    dockerfilePath: ./infra/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/readyz
+    autoDeployTrigger: 'off'
+    envVars:
+      - key: API_ADDR
+        value: 0.0.0.0:8080
+      - key: EXHIBIT_STORE
+        value: demo
+      - key: EXHIBIT_COOKIE_SECURE
+        value: 'true'
