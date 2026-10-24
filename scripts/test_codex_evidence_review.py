@@ -76,11 +76,11 @@ class CodexReviewTests(unittest.TestCase):
     def test_missing_auth_is_explicitly_not_run(self):
         with tempfile.TemporaryDirectory() as directory:
             summary = Path(directory) / 'summary'; output = Path(directory) / 'output'
-            with patch.dict(os.environ, {'CODEX_AUTH_JSON':'', 'GITHUB_STEP_SUMMARY':str(summary), 'GITHUB_OUTPUT':str(output)}), patch('codex_evidence_review.run_cli') as cli:
+            with patch.dict(os.environ, {'CODEX_AUTH_JSON':'', 'GITHUB_STEP_SUMMARY':str(summary), 'GITHUB_OUTPUT':str(output), 'REVIEW_OUTPUT':str(Path(directory)/'review.md')}), patch('codex_evidence_review.run_cli') as cli:
                 self.assertEqual(main(), 0)
                 cli.assert_not_called()
             self.assertEqual(output.read_text(), 'status=not_configured\n')
-            self.assertIn('No agent was run', summary.read_text())
+            self.assertIn('No agent was run', (Path(directory)/'report.md').read_text())
 
     def test_invalid_auth_fails_without_echoing_secret(self):
         with self.assertRaises(InvalidEvidence):

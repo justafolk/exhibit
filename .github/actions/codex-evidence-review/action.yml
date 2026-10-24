@@ -19,7 +19,16 @@ inputs:
 outputs:
   status:
     description: completed, not_configured or failed
-    value: ${{ steps.review.outputs.status }}
+    value: ${{ steps.report.outputs.status }}
+  report-json:
+    description: Structured Codex CI report path, including non-completed outcomes
+    value: ${{ steps.report.outputs.report-json }}
+  report-markdown:
+    description: Human-readable Codex CI report path
+    value: ${{ steps.report.outputs.report-markdown }}
+  report-html:
+    description: Standalone browser-readable report path
+    value: ${{ steps.report.outputs.report-html }}
 runs:
   using: composite
   steps:
@@ -68,3 +77,15 @@ runs:
       run: |
         export CODEX_BINARY=/opt/exhibit-codex-cli/node_modules/.bin/codex
         python3 "$EXHIBIT_ACTION_PATH/../../../scripts/codex_evidence_review.py"
+    - name: Write Codex CI output report
+      id: report
+      if: always()
+      shell: bash
+      env:
+        EXHIBIT_ACTION_PATH: ${{ github.action_path }}
+        REVIEW_OUTPUT: ${{ inputs.review-output }}
+        EXPECTED_SHA: ${{ inputs.head-sha }}
+        EXPECTED_PR: ${{ inputs.pull-request }}
+        EXPECTED_RUN_ID: ${{ github.run_id }}
+        EXPECTED_ATTEMPT: ${{ github.run_attempt }}
+      run: python3 "$EXHIBIT_ACTION_PATH/../../../scripts/codex_ci_report.py"
