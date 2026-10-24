@@ -16,6 +16,15 @@ inputs:
   require-video:
     description: Fail collection when no nonempty video artifact was recorded
     default: 'true'
+  require-api:
+    description: Require and collect API JUnit results and clean-start provenance
+    default: 'false'
+  api-junit:
+    description: Node JUnit API report path
+    default: .local/evidence/api-tests.xml
+  api-capture:
+    description: API runner startup provenance and exit status path
+    default: .local/evidence/api-capture.json
 outputs:
   eligible:
     description: Whether this event should run the sample evidence tests
@@ -33,6 +42,9 @@ runs:
         EVIDENCE_MODE: ${{ inputs.mode }}
         PLAYWRIGHT_JSON: ${{ inputs.playwright-json }}
         ARTIFACT_ROOT: ${{ inputs.artifact-root }}
+        REQUIRE_API: ${{ inputs.require-api }}
+        API_JUNIT: ${{ inputs.api-junit }}
+        API_CAPTURE: ${{ inputs.api-capture }}
         REQUIRE_VIDEO: ${{ inputs.require-video }}
         MANIFEST_PATH: ${{ inputs.manifest-path }}
       run: python3 "$EXHIBIT_ACTION_PATH/../../../scripts/pr_evidence.py" "$EVIDENCE_MODE"

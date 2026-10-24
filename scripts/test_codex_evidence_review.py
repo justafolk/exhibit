@@ -8,7 +8,7 @@ import tomllib
 import unittest
 from unittest.mock import patch
 
-from codex_evidence_review import cli_command, main, prepare, run_cli
+from codex_evidence_review import cli_command, cli_failure_category, main, prepare, run_cli
 from evidence_capture import capture
 from evidence_tool import InvalidEvidence
 from pr_evidence import recording_index
@@ -64,14 +64,23 @@ class CodexReviewTests(unittest.TestCase):
         self.assertEqual(profile['filesystem'], {'/tmp/auth':'deny', '/proc':'deny'})
         self.assertEqual(config['approval_policy'], 'never')
 
+    def test_diagnostic_categories_never_echo_provider_text(self):
+        for text, category in (("permission denied: synthetic-credential", "runner permissions"),
+                               ("401 unauthorized: synthetic-credential", "account authentication"),
+                               ("bwrap failed: synthetic-credential", "runner sandbox"),
+                               ("unknown failure synthetic-credential", "CLI execution")):
+            result = subprocess.CompletedProcess([], 1, "", text)
+            self.assertEqual(cli_failure_category(result), category)
+            self.assertNotIn("synthetic-credential", cli_failure_category(result))
+
     def test_missing_auth_is_explicitly_not_run(self):
         with tempfile.TemporaryDirectory() as directory:
             summary = Path(directory) / 'summary'; output = Path(directory) / 'output'
-            with patch.dict(os.environ, {'CODEX_AUTH_JSON':'', 'GITHUB_STEP_SUMMARY':str(summary), 'GITHUB_OUTPUT':str(output)}), patch('codex_evidence_review.run_cli') as cli:
+            with patch.dict(os.environ, {'CODEX_AUTH_JSON':'', 'GITHUB_STEP_SUMMARY':str(summary), 'GITHUB_OUTPUT':str(output), 'REVIEW_OUTPUT':str(Path(directory)/'review.md')}), patch('codex_evidence_review.run_cli') as cli:
                 self.assertEqual(main(), 0)
                 cli.assert_not_called()
             self.assertEqual(output.read_text(), 'status=not_configured\n')
-            self.assertIn('No agent was run', summary.read_text())
+            self.assertIn('No agent was run', (Path(directory)/'report.md').read_text())
 
     def test_invalid_auth_fails_without_echoing_secret(self):
         with self.assertRaises(InvalidEvidence):
