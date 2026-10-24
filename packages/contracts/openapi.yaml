@@ -6,6 +6,308 @@ info:
     Private workspace API. Authenticated metadata and contract completeness never authorize
     execution. Demo sessions only read sample evidence and ephemeral settings.
 paths:
+  /api/v1/ingestion-tokens:
+    {
+      'get':
+        {
+          'operationId': 'listIngestionTokens',
+          'description': 'Workspace owners only.',
+          'responses':
+            {
+              '200':
+                {
+                  'description': 'Success',
+                  'content':
+                    {
+                      'application/json':
+                        {
+                          'schema':
+                            {
+                              '$ref': '#/components/schemas/IngestionTokenList',
+                            },
+                        },
+                    },
+                },
+              '401': { 'description': 'Authentication required' },
+              '404': { 'description': 'Record not found' },
+              '409': { 'description': 'Conflicting or incomplete submission' },
+              '503': { 'description': 'Persistent storage unavailable' },
+            },
+        },
+      'post':
+        {
+          'operationId': 'createIngestionToken',
+          'description': 'Owner only; CSRF required. Repository-scoped token expires in 90 days. Secret is returned once.',
+          'responses':
+            {
+              '401': { 'description': 'Authentication required' },
+              '404': { 'description': 'Record not found' },
+              '409': { 'description': 'Conflicting or incomplete submission' },
+              '503': { 'description': 'Persistent storage unavailable' },
+              '201':
+                {
+                  'description': 'Success',
+                  'content':
+                    {
+                      'application/json':
+                        {
+                          'schema':
+                            {
+                              '$ref': '#/components/schemas/IngestionTokenSecret',
+                            },
+                        },
+                    },
+                },
+            },
+          'requestBody':
+            {
+              'required': true,
+              'content':
+                {
+                  'application/json':
+                    {
+                      'schema':
+                        { '$ref': '#/components/schemas/IngestionTokenInput' },
+                    },
+                },
+            },
+        },
+    }
+  /api/v1/ingestion-tokens/{id}:
+    {
+      'parameters':
+        [
+          {
+            'name': 'id',
+            'in': 'path',
+            'required': true,
+            'schema': { 'type': 'string' },
+          },
+        ],
+      'delete':
+        {
+          'operationId': 'revokeIngestionToken',
+          'responses':
+            {
+              '200': { 'description': 'Revoked' },
+              '403': { 'description': 'Owner and CSRF required' },
+            },
+        },
+    }
+  /api/v1/captures:
+    {
+      'get':
+        {
+          'operationId': 'listCICaptures',
+          'description': 'Latest 500 uploaded video files from complete workspace CI runs.',
+          'responses':
+            {
+              '200':
+                {
+                  'description': 'Success',
+                  'content':
+                    {
+                      'application/json':
+                        {
+                          'schema':
+                            { '$ref': '#/components/schemas/CIFileList' },
+                        },
+                    },
+                },
+              '401': { 'description': 'Authentication required' },
+              '404': { 'description': 'Record not found' },
+              '409': { 'description': 'Conflicting or incomplete submission' },
+              '503': { 'description': 'Persistent storage unavailable' },
+            },
+        },
+    }
+  /api/v1/runs/{id}/ci:
+    {
+      'parameters':
+        [
+          {
+            'name': 'id',
+            'in': 'path',
+            'required': true,
+            'schema': { 'type': 'string' },
+          },
+        ],
+      'get':
+        {
+          'operationId': 'getCIReport',
+          'description': '',
+          'responses':
+            {
+              '200':
+                {
+                  'description': 'Success',
+                  'content':
+                    {
+                      'application/json':
+                        {
+                          'schema': { '$ref': '#/components/schemas/CIRecord' },
+                        },
+                    },
+                },
+              '401': { 'description': 'Authentication required' },
+              '404': { 'description': 'Record not found' },
+              '409': { 'description': 'Conflicting or incomplete submission' },
+              '503': { 'description': 'Persistent storage unavailable' },
+            },
+        },
+    }
+  /api/v1/runs/{id}/files/{file}:
+    {
+      'parameters':
+        [
+          {
+            'name': 'id',
+            'in': 'path',
+            'required': true,
+            'schema': { 'type': 'string' },
+          },
+          {
+            'name': 'file',
+            'in': 'path',
+            'required': true,
+            'schema': { 'type': 'string' },
+          },
+        ],
+      'get':
+        {
+          'operationId': 'downloadCIFile',
+          'description': 'Session-authorized private artifact. Videos support HEAD and byte ranges; active documents download only.',
+          'responses':
+            {
+              '200':
+                {
+                  'description': 'Original bytes',
+                  'content':
+                    {
+                      'application/octet-stream':
+                        { 'schema': { 'type': 'string', 'format': 'binary' } },
+                    },
+                },
+              '206': { 'description': 'Byte range' },
+              '401': { 'description': 'Sign in required' },
+              '404': { 'description': 'File outside workspace or absent' },
+              '409': { 'description': 'Upload incomplete' },
+              '503': { 'description': 'Storage unavailable' },
+            },
+        },
+    }
+  /api/ingest/v1/runs:
+    {
+      'post':
+        {
+          'operationId': 'beginCIUpload',
+          'description': 'Bounded 4 MiB JSON; repository must match token. Identical attempt replay returns existing file IDs; different payload conflicts. Files capped at 128 MiB each, 512 MiB total, 500 files. id must be empty and uploaded false on submission.',
+          'responses':
+            {
+              '200':
+                {
+                  'description': 'Success',
+                  'content':
+                    {
+                      'application/json':
+                        {
+                          'schema': { '$ref': '#/components/schemas/CIRecord' },
+                        },
+                    },
+                },
+              '401': { 'description': 'Authentication required' },
+              '404': { 'description': 'Record not found' },
+              '409': { 'description': 'Conflicting or incomplete submission' },
+              '503': { 'description': 'Persistent storage unavailable' },
+            },
+          'requestBody':
+            {
+              'required': true,
+              'content':
+                {
+                  'application/json':
+                    { 'schema': { '$ref': '#/components/schemas/CIInput' } },
+                },
+            },
+          'security': [{ 'ingestionBearer': [] }],
+        },
+    }
+  /api/ingest/v1/runs/{id}/files/{file}:
+    {
+      'parameters':
+        [
+          {
+            'name': 'id',
+            'in': 'path',
+            'required': true,
+            'schema': { 'type': 'string' },
+          },
+          {
+            'name': 'file',
+            'in': 'path',
+            'required': true,
+            'schema': { 'type': 'string' },
+          },
+        ],
+      'put':
+        {
+          'operationId': 'uploadCIFile',
+          'security': [{ 'ingestionBearer': [] }],
+          'description': 'Atomic streaming upload; size and SHA-256 must match declared inventory. No browser session required.',
+          'requestBody':
+            {
+              'required': true,
+              'content':
+                {
+                  'application/octet-stream':
+                    { 'schema': { 'type': 'string', 'format': 'binary' } },
+                },
+            },
+          'responses':
+            {
+              '200': { 'description': 'Uploaded' },
+              '400': { 'description': 'Length/hash mismatch' },
+              '401': { 'description': 'Token invalid' },
+              '404': { 'description': 'File outside token scope' },
+            },
+        },
+    }
+  /api/ingest/v1/runs/{id}/complete:
+    {
+      'parameters':
+        [
+          {
+            'name': 'id',
+            'in': 'path',
+            'required': true,
+            'schema': { 'type': 'string' },
+          },
+        ],
+      'post':
+        {
+          'operationId': 'completeCIUpload',
+          'description': 'Fails until every declared file is uploaded. Complete results remain unverified; no verdict is granted.',
+          'responses':
+            {
+              '200':
+                {
+                  'description': 'Success',
+                  'content':
+                    {
+                      'application/json':
+                        {
+                          'schema': { '$ref': '#/components/schemas/CIRecord' },
+                        },
+                    },
+                },
+              '401': { 'description': 'Authentication required' },
+              '404': { 'description': 'Record not found' },
+              '409': { 'description': 'Conflicting or incomplete submission' },
+              '503': { 'description': 'Persistent storage unavailable' },
+            },
+          'security': [{ 'ingestionBearer': [] }],
+        },
+    }
   /api/healthz:
     get:
       operationId: health
@@ -68,6 +370,7 @@ paths:
               - partial
               - failed
               - couldnt_run
+              - unverified
   /api/v1/runs/{id}:
     get:
       operationId: getRun
@@ -584,6 +887,185 @@ components:
     Unavailable:
       description: Evidence store unavailable
   schemas:
+    CIInfo:
+      {
+        'type': 'object',
+        'required': ['workflowRunId', 'attempt', 'url', 'complete'],
+        'properties':
+          {
+            'workflowRunId': { 'type': 'integer' },
+            'attempt': { 'type': 'integer' },
+            'url': { 'type': 'string' },
+            'complete': { 'type': 'boolean' },
+          },
+      }
+    CIFile:
+      {
+        'type': 'object',
+        'required': ['id', 'path', 'mediaType', 'bytes', 'sha256', 'uploaded'],
+        'properties':
+          {
+            'id': { 'type': 'string' },
+            'path': { 'type': 'string' },
+            'mediaType': { 'type': 'string' },
+            'bytes': { 'type': 'integer' },
+            'sha256': { 'type': 'string' },
+            'uploaded': { 'type': 'boolean' },
+          },
+      }
+    CISavedFile:
+      {
+        'allOf':
+          [
+            { '$ref': '#/components/schemas/CIFile' },
+            {
+              'type': 'object',
+              'required': ['runId', 'repository', 'pullRequest', 'createdAt'],
+              'properties':
+                {
+                  'runId': { 'type': 'string' },
+                  'repository': { 'type': 'string' },
+                  'pullRequest': { 'type': 'integer' },
+                  'createdAt': { 'type': 'string', 'format': 'date-time' },
+                },
+            },
+          ],
+      }
+    CIFileList:
+      {
+        'type': 'object',
+        'required': ['files'],
+        'properties':
+          {
+            'files':
+              {
+                'type': 'array',
+                'items': { '$ref': '#/components/schemas/CISavedFile' },
+              },
+          },
+      }
+    CIInput:
+      {
+        'type': 'object',
+        'required':
+          [
+            'repository',
+            'pullRequest',
+            'title',
+            'headSha',
+            'workflowRunId',
+            'attempt',
+            'startedAt',
+            'durationSeconds',
+            'outcome',
+            'assertions',
+            'notCovered',
+            'manifest',
+            'codexReport',
+            'workflow',
+            'files',
+          ],
+        'properties':
+          {
+            'repository': { 'type': 'string' },
+            'pullRequest': { 'type': 'integer' },
+            'title': { 'type': 'string' },
+            'headSha': { 'type': 'string' },
+            'workflowRunId': { 'type': 'integer' },
+            'attempt': { 'type': 'integer' },
+            'startedAt': { 'type': 'string', 'format': 'date-time' },
+            'durationSeconds': { 'type': 'integer' },
+            'outcome':
+              {
+                'type': 'string',
+                'enum': ['success', 'failure', 'cancelled', 'skipped'],
+              },
+            'assertions':
+              {
+                'type': 'array',
+                'items':
+                  {
+                    'type': 'object',
+                    'required': ['label', 'status'],
+                    'properties':
+                      {
+                        'label': { 'type': 'string' },
+                        'status':
+                          {
+                            'type': 'string',
+                            'enum': ['passed', 'failed', 'skipped'],
+                          },
+                      },
+                  },
+              },
+            'notCovered': { 'type': 'array', 'items': { 'type': 'string' } },
+            'manifest': {},
+            'codexReport': {},
+            'workflow': {},
+            'files':
+              {
+                'type': 'array',
+                'items': { '$ref': '#/components/schemas/CIFile' },
+              },
+          },
+      }
+    CIRecord:
+      {
+        'type': 'object',
+        'required': ['runId', 'complete', 'submission'],
+        'properties':
+          {
+            'runId': { 'type': 'string' },
+            'complete': { 'type': 'boolean' },
+            'submission': { '$ref': '#/components/schemas/CIInput' },
+          },
+      }
+    IngestionToken:
+      {
+        'type': 'object',
+        'required': ['id', 'repository', 'createdAt', 'expiresAt', 'revokedAt'],
+        'properties':
+          {
+            'id': { 'type': 'string' },
+            'repository': { 'type': 'string' },
+            'createdAt': { 'type': 'string', 'format': 'date-time' },
+            'expiresAt': { 'type': 'string', 'format': 'date-time' },
+            'revokedAt': { 'type': ['string', 'null'], 'format': 'date-time' },
+          },
+      }
+    IngestionTokenList:
+      {
+        'type': 'object',
+        'required': ['tokens'],
+        'properties':
+          {
+            'tokens':
+              {
+                'type': 'array',
+                'items': { '$ref': '#/components/schemas/IngestionToken' },
+              },
+          },
+      }
+    IngestionTokenSecret:
+      {
+        'type': 'object',
+        'required': ['token', 'secret'],
+        'properties':
+          {
+            'token': { '$ref': '#/components/schemas/IngestionToken' },
+            'secret':
+              {
+                'type': 'string',
+                'description': 'Shown only at creation. Store in GitHub Actions secrets.',
+              },
+          },
+      }
+    IngestionTokenInput:
+      {
+        'type': 'object',
+        'required': ['repository'],
+        'properties': { 'repository': { 'type': 'string' } },
+      }
     EvidenceContract:
       type: object
       additionalProperties: false
@@ -695,6 +1177,7 @@ components:
             - partial
             - failed
             - couldnt_run
+            - unverified
         sample:
           type: boolean
         environment:
@@ -720,6 +1203,11 @@ components:
                 type: string
               passed:
                 type: boolean
+              status:
+                type: string
+                enum: [passed, failed, skipped]
+        ci:
+          $ref: '#/components/schemas/CIInfo'
         notCovered:
           type: array
           items:
@@ -1228,6 +1716,9 @@ components:
           items:
             $ref: '#/components/schemas/Activity'
   securitySchemes:
+    ingestionBearer:
+      type: http
+      scheme: bearer
     sessionCookie:
       type: apiKey
       in: cookie

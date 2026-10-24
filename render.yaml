@@ -1,19 +1,30 @@
-# Browsable sample workspace. No database, credentials, or customer execution.
+# Private persistent workspace. Connect the existing database; applying this blueprint
+# requires a paid Render service/disk. Review pricing before applying.
 services:
   - type: web
     name: exhibit-sample
     runtime: docker
     repo: https://github.com/justafolk/exhibit
-    branch: agent/studio-handoff
-    plan: free
+    branch: main
+    plan: starter
     dockerfilePath: ./infra/Dockerfile
     dockerContext: .
     healthCheckPath: /api/readyz
     autoDeployTrigger: 'off'
+    disk:
+      name: exhibit-artifacts
+      mountPath: /var/lib/exhibit/artifacts
+      sizeGB: 10
     envVars:
       - key: API_ADDR
         value: 0.0.0.0:8080
       - key: EXHIBIT_STORE
-        value: demo
+        value: postgres
+      - key: DATABASE_URL
+        sync: false
+      - key: EXHIBIT_ARTIFACT_DIR
+        value: /var/lib/exhibit/artifacts
+      - key: EXHIBIT_PUBLIC_ORIGIN
+        value: https://exhibit-sample.onrender.com
       - key: EXHIBIT_COOKIE_SECURE
         value: 'true'

@@ -1,3 +1,4 @@
+import { CIReport } from '../components/CIEvidence';
 import { displayLabel } from '../labels';
 import { useEffect, useState } from 'react';
 import type { Run, WorkspaceClient } from '../client';
@@ -33,6 +34,14 @@ export function RunDetail({
       active = false;
     };
   }, [client, id, retry]);
+  useEffect(() => {
+    if (!run?.ci || run.ci.complete) return;
+    const timer = window.setTimeout(
+      () => setRetry((value) => value + 1),
+      10000,
+    );
+    return () => window.clearTimeout(timer);
+  }, [run]);
   if (error)
     return (
       <div role="alert">
@@ -169,9 +178,11 @@ export function RunDetail({
               {run.assertions.map((assertion, index) => (
                 <li key={`${index}-${assertion.label}`}>
                   <span
-                    className={`assertion-symbol ${assertion.passed ? 'pass' : 'fail'}`}
+                    className={`assertion-symbol ${assertion.status === 'skipped' ? 'skip' : assertion.passed ? 'pass' : 'fail'}`}
                   >
-                    {assertion.passed ? (
+                    {assertion.status === 'skipped' ? (
+                      <Icon name="clock" size={14} />
+                    ) : assertion.passed ? (
                       <Icon name="check" size={14} />
                     ) : (
                       <Icon name="close" size={14} />
@@ -179,7 +190,11 @@ export function RunDetail({
                   </span>
                   <span>{assertion.label}</span>
                   <span className="quiet-text">
-                    {assertion.passed ? 'Passed' : 'Failed'}
+                    {assertion.status === 'skipped'
+                      ? 'Skipped'
+                      : assertion.passed
+                        ? 'Passed'
+                        : 'Failed'}
                   </span>
                 </li>
               ))}
@@ -238,10 +253,14 @@ export function RunDetail({
           . It is a separate CI run, not evidence for this illustrative report.
         </p>
       )}
-      <Notice>
-        Recordings and traces are not attached to this report. Artifact
-        collection must be connected before downloads are available.
-      </Notice>
+      {run.ci ? (
+        <CIReport client={client} run={run} />
+      ) : (
+        <Notice>
+          Recordings and traces are not attached to this report. Artifact
+          collection must be connected before downloads are available.
+        </Notice>
+      )}
     </>
   );
 }

@@ -12,7 +12,7 @@ In a trusted, clean checkout of justafolk/exhibit:
 5. Return the generated report.md, manifest.json, videos and traces from the printed bundle directory. Include failures and coverage gaps.
 
 This command records Exhibit's own secret-free browser suite. It does not run customer staging flows, upload artifacts, post PR checks, or certify a verified verdict.
-Never put customer credentials in this workflow. Hosted execution and ingestion are not connected yet.
+Never put customer credentials in this workflow. Hosted execution is not connected yet. To save completed GitHub Actions evidence, create an upload token in workspace Settings and connect the persistence workflow.
 `;
 export function AgentSetup() {
   const [copied, setCopied] = useState(false);

@@ -1,5 +1,8 @@
 import type { components } from '../../../packages/contracts/src/api';
 
+export type CIRecord = components['schemas']['CIRecord'];
+export type SavedCIFile = components['schemas']['CISavedFile'];
+export type IngestionToken = components['schemas']['IngestionToken'];
 export type Run = components['schemas']['Run'];
 export type RunList = components['schemas']['RunList'];
 export type Session = components['schemas']['Session'];
@@ -29,6 +32,13 @@ export interface WorkspaceClient {
   logout(): Promise<void>;
   listRuns(filters?: { q?: string; status?: Run['status'] }): Promise<RunList>;
   getRun(id: string): Promise<Run>;
+  getCI(id: string): Promise<CIRecord>;
+  listCaptures(): Promise<{ files: SavedCIFile[] }>;
+  listIngestionTokens(): Promise<{ tokens: IngestionToken[] }>;
+  createIngestionToken(
+    repository: string,
+  ): Promise<components['schemas']['IngestionTokenSecret']>;
+  revokeIngestionToken(id: string): Promise<void>;
   getSetup(): Promise<Setup>;
   saveSetup(setup: Setup): Promise<Setup>;
   renameWorkspace(name: string): Promise<Workspace>;
@@ -123,6 +133,18 @@ export const apiClient: WorkspaceClient = {
     return request<RunList>(`/runs${params.size ? `?${params}` : ''}`);
   },
   getRun: (id) => request<Run>(`/runs/${encodeURIComponent(id)}`),
+  getCI: (id) => request<CIRecord>(`/runs/${encodeURIComponent(id)}/ci`),
+  listCaptures: () => request<{ files: SavedCIFile[] }>('/captures'),
+  listIngestionTokens: () =>
+    request<{ tokens: IngestionToken[] }>('/ingestion-tokens'),
+  createIngestionToken: (repository) =>
+    request<components['schemas']['IngestionTokenSecret']>(
+      '/ingestion-tokens',
+      'POST',
+      { repository },
+    ),
+  revokeIngestionToken: (id) =>
+    request<void>(`/ingestion-tokens/${encodeURIComponent(id)}`, 'DELETE'),
   getSetup: () => request<Setup>('/setup'),
   saveSetup: (setup) => request<Setup>('/setup', 'PUT', setup),
   renameWorkspace: (name) =>

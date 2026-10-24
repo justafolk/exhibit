@@ -25,7 +25,7 @@ export function markdownReport(run: Run): string {
     '',
     ...run.assertions.map(
       (assertion) =>
-        `- ${assertion.passed ? 'PASS' : 'FAIL'}: ${inline(assertion.label)}`,
+        `- ${assertion.status === 'skipped' ? 'SKIPPED' : assertion.passed ? 'PASS' : 'FAIL'}: ${inline(assertion.label)}`,
     ),
     ...(run.assertions.length ? [] : ['No assertions recorded.']),
     '',
@@ -43,7 +43,9 @@ export function markdownReport(run: Run): string {
     '',
     '## Evidence limits',
     '',
-    'Recordings, traces, and execution attempts are not attached to this report.',
+    run.ci
+      ? `Workflow attempt: ${run.ci.url}. Open the dashboard run to view stored reports and private artifacts. CI submissions are unverified.`
+      : 'Recordings, traces, and execution attempts are not attached to this report.',
     'A recorded outcome does not establish coverage beyond the assertions and flows listed above.',
     '',
   ];

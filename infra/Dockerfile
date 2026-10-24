@@ -21,10 +21,11 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.commitSHA=${COMMIT_
 
 FROM alpine:3.22
 RUN apk add --no-cache ca-certificates && addgroup -S exhibit && adduser -S -G exhibit exhibit
+RUN mkdir -p /var/lib/exhibit/artifacts && chown -R exhibit:exhibit /var/lib/exhibit
 WORKDIR /app
 COPY --from=api /out/ /app/
 COPY --from=web /src/apps/web/dist /app/web
 USER exhibit
-ENV API_ADDR=0.0.0.0:8080 STATIC_DIR=/app/web EXHIBIT_STORE=postgres
+ENV API_ADDR=0.0.0.0:8080 STATIC_DIR=/app/web EXHIBIT_STORE=postgres EXHIBIT_ARTIFACT_DIR=/var/lib/exhibit/artifacts
 EXPOSE 8080
 ENTRYPOINT ["/app/exhibit"]

@@ -13,7 +13,7 @@ export function Overview({
   client: WorkspaceClient;
 }) {
   const attention = data.runs.filter((run) =>
-    ['partial', 'failed', 'couldnt_run'].includes(run.status),
+    ['partial', 'failed', 'couldnt_run', 'unverified'].includes(run.status),
   ).length;
   return (
     <>

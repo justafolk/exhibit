@@ -63,7 +63,7 @@ func run() error {
 	default:
 		return errors.New("EXHIBIT_COOKIE_SECURE must be true or false")
 	}
-	server := &http.Server{Addr: addr, Handler: httpapi.Server{Store: data, Identity: identity, SecureCookies: secureCookies, PublicOrigin: os.Getenv("EXHIBIT_PUBLIC_ORIGIN"), CommitSHA: commitSHA, StaticDir: os.Getenv("STATIC_DIR")}.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+	server := &http.Server{Addr: addr, Handler: httpapi.Server{Store: data, Identity: identity, SecureCookies: secureCookies, PublicOrigin: os.Getenv("EXHIBIT_PUBLIC_ORIGIN"), ArtifactDir: os.Getenv("EXHIBIT_ARTIFACT_DIR"), CommitSHA: commitSHA, StaticDir: os.Getenv("STATIC_DIR")}.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 2 * time.Minute, WriteTimeout: 2 * time.Minute, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 	result := make(chan error, 1)
 	go func() {
 		slog.Info("exhibit API listening", "address", addr, "mode", mode)

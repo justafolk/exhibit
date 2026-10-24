@@ -1,3 +1,4 @@
+import { CICaptures } from '../components/CIEvidence';
 import { useState } from 'react';
 import type { RunList, Session, WorkspaceClient } from '../client';
 import { Icon, PageHeading } from '../ui';
@@ -28,24 +29,30 @@ export function Recordings({
           </a>
         }
       />
-      <SampleGallery />
-      <section className="panel capture-empty">
-        <div className="capture-empty-icon">
-          <Icon name="branch" size={25} />
-        </div>
-        <div>
-          <h2>Your workspace captures</h2>
-          <p>
-            The gallery above is curated footage imported from GitHub Actions.
-            Automatic ingestion of your workspace's artifacts is not connected
-            yet.
-          </p>
-          <a className="text-link" href="#/agents">
-            Get the agent instructions <Icon name="arrow" size={14} />
-          </a>
-        </div>
-        <span className="quiet-badge">Recording gallery available</span>
-      </section>
+      {session.mode === 'demo' ? (
+        <SampleGallery />
+      ) : (
+        <CICaptures client={client} />
+      )}
+      {session.mode === 'demo' && (
+        <section className="panel capture-empty">
+          <div className="capture-empty-icon">
+            <Icon name="branch" size={25} />
+          </div>
+          <div>
+            <h2>Your workspace captures</h2>
+            <p>
+              The gallery above is curated footage imported from GitHub Actions.
+              Sign in to your private workspace to view automatically uploaded
+              recordings.
+            </p>
+            <a className="text-link" href="#/agents">
+              Get the agent instructions <Icon name="arrow" size={14} />
+            </a>
+          </div>
+          <span className="quiet-badge">Recording gallery available</span>
+        </section>
+      )}
       <details
         className="panel advanced-tools"
         open={manualOpen}

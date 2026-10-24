@@ -1,3 +1,4 @@
+import { IngestionSettings } from '../components/IngestionSettings';
 import { useEffect, useState } from 'react';
 import type { Session, WorkspaceClient, Workspace } from '../client';
 import { message } from '../navigation';
@@ -140,6 +141,9 @@ export function Settings({
           </a>
         </div>
       </section>
+      {session.mode === 'postgres' && session.workspace.role === 'owner' && (
+        <IngestionSettings client={client} />
+      )}
       <section
         id="workspace-session"
         className="panel settings-panel session-panel"

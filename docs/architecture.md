@@ -27,8 +27,12 @@ manifest never changes a run verdict. Recent authorship events are a tenant-scop
 There is no mutation endpoint that schedules customer execution.
 OpenAPI is the shared boundary; TypeScript types are generated and CI detects drift.
 
-PostgreSQL holds relational metadata and JSONB assertions. Trusted artifacts will live in private
-object storage with checksums, redaction gates and retention, not in database byte columns.
+PostgreSQL holds relational metadata and JSONB assertions. CI artifacts live on a private durable mounted volume with hash-checked atomic uploads,
+workspace authorization and authenticated range delivery, not in database byte columns.
+PostgreSQL also stores raw CI report JSON, attempt identity, upload state and hashed
+repository-scoped ingestion credentials. Successful self-reported CI evidence remains
+unverified. See [the storage decision](decisions/0002-ci-evidence-storage.md) and
+[deployment/integration guide](action-evidence-storage.md). Retention is operator-managed.
 Migrations are explicit, checksum-verified and transactionally serialized. They are never
 applied automatically on API startup. Sample seeding is loopback-only and idempotent.
 
