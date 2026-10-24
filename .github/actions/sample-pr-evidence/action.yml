@@ -25,6 +25,9 @@ inputs:
   api-capture:
     description: API runner startup provenance and exit status path
     default: .local/evidence/api-capture.json
+  create-previews:
+    description: Create bounded animated GIF previews for a PR comment in this secret-free job
+    default: 'false'
 outputs:
   eligible:
     description: Whether this event should run the sample evidence tests
@@ -42,6 +45,7 @@ runs:
         EVIDENCE_MODE: ${{ inputs.mode }}
         PLAYWRIGHT_JSON: ${{ inputs.playwright-json }}
         ARTIFACT_ROOT: ${{ inputs.artifact-root }}
+        CREATE_PREVIEWS: ${{ inputs.create-previews }}
         REQUIRE_API: ${{ inputs.require-api }}
         API_JUNIT: ${{ inputs.api-junit }}
         API_CAPTURE: ${{ inputs.api-capture }}

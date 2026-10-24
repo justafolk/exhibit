@@ -9,6 +9,7 @@ import sys
 
 from evidence_capture import capture
 from api_evidence import collect_api
+from evidence_previews import previews
 from evidence_tool import InvalidEvidence, SHA, read_json, report, require, validate_manifest, verify_artifacts, timestamp
 
 ACTIONS = {"opened", "reopened", "synchronize", "labeled", "ready_for_review"}
@@ -88,8 +89,16 @@ def main():
             manifest["notCovered"][0] = "Secret-free sample frontend browser and backend API tests only; no deployed staging or production was exercised"
             validate_manifest(manifest, manifest["headSha"])
             verify_artifacts(manifest, Path(os.environ["ARTIFACT_ROOT"]))
+        preview_index = None
+        if os.environ.get("CREATE_PREVIEWS", "false") == "true":
+            preview_index, preview_artifacts = previews(manifest, Path(os.environ["ARTIFACT_ROOT"]))
+            manifest["artifacts"].extend(preview_artifacts)
+            validate_manifest(manifest, manifest["headSha"])
+            verify_artifacts(manifest, Path(os.environ["ARTIFACT_ROOT"]))
         output = Path(os.environ["MANIFEST_PATH"])
         output.parent.mkdir(parents=True, exist_ok=True)
+        if preview_index is not None:
+            output.with_name("previews.json").write_text(json.dumps(preview_index, indent=2)+"\n")
         output.write_text(json.dumps(manifest, indent=2) + "\n")
         markdown = report(manifest, bytes_checked=True)
         output.with_suffix(".md").write_text(markdown)
