@@ -152,13 +152,11 @@ test('invalid imports and failed metadata saves preserve usable local media', as
   const bytes = await sampleClip(page);
   await importClip(page, bytes);
   const originalURL = await page.locator('video').getAttribute('src');
-  await page
-    .getByLabel('Import video', { exact: true })
-    .setInputFiles({
-      name: 'corrupt.webm',
-      mimeType: 'video/webm',
-      buffer: Buffer.from('not a video'),
-    });
+  await page.getByLabel('Import video', { exact: true }).setInputFiles({
+    name: 'corrupt.webm',
+    mimeType: 'video/webm',
+    buffer: Buffer.from('not a video'),
+  });
   await expect(page.getByRole('alert')).toBeVisible();
   await expect(page.locator('video')).toHaveAttribute('src', originalURL!);
   await page.route('**/api/v1/recordings', async (route) => {
@@ -263,6 +261,11 @@ test('screen recorder produces playable local bytes and releases shared tracks',
       ),
     )
     .toBeGreaterThan(6);
+  // Simulate a delayed stop callback: elapsed wall time must not become media duration.
+  await page.evaluate(() => {
+    const now = performance.now.bind(performance);
+    performance.now = () => now() + 60_000;
+  });
   await page
     .getByRole('button', { name: 'Stop recording', exact: true })
     .click();
@@ -278,6 +281,15 @@ test('screen recorder produces playable local bytes and releases shared tracks',
       ),
     )
     .toBe(true);
+  const manifestEvent = page.waitForEvent('download');
+  await page
+    .getByRole('button', { name: 'Download manifest', exact: true })
+    .click();
+  const manifest = JSON.parse(
+    await readFile((await (await manifestEvent).path())!, 'utf8'),
+  );
+  expect(manifest.durationSeconds).toBeGreaterThan(0);
+  expect(manifest.durationSeconds).toBeLessThan(10);
   await expect(page.locator('video')).toBeVisible();
   await page
     .getByRole('button', { name: 'Record screen', exact: true })
@@ -298,4 +310,49 @@ test('screen recorder produces playable local bytes and releases shared tracks',
       ),
     )
     .toBe(true);
+});
+
+test('a delayed recording list preserves newly saved metadata', async ({
+  page,
+}) => {
+  let release!: () => void;
+  const delayed = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let requested!: () => void;
+  const started = new Promise<void>((resolve) => {
+    requested = resolve;
+  });
+  await page.route('**/api/v1/recordings', async (route) => {
+    if (route.request().method() !== 'GET') return route.continue();
+    const response = await route.fetch();
+    requested();
+    await delayed;
+    await route.fulfill({ response });
+  });
+  await studio(page);
+  await started;
+  await importClip(page, await sampleClip(page));
+  await page
+    .getByLabel('Recording name', { exact: true })
+    .fill('Saved during loading');
+  await page
+    .getByRole('button', { name: 'Save metadata', exact: true })
+    .click();
+  const saved = page.getByRole('button', {
+    name: 'Download manifest for Saved during loading',
+    exact: true,
+  });
+  await expect(saved).toBeVisible();
+  const response = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/api/v1/recordings') &&
+      response.request().method() === 'GET',
+  );
+  release();
+  await response;
+  await expect(
+    page.getByText('No recording metadata has been saved.', { exact: false }),
+  ).toHaveCount(0);
+  await expect(saved).toBeVisible();
 });
