@@ -1,0 +1,60 @@
+name: Codex evidence review
+description: Advisory Codex CLI review of verified sample test metadata using a ChatGPT login
+inputs:
+  codex-auth-json:
+    description: GitHub secret containing Codex CLI ChatGPT auth.json; never an inline credential
+    default: ''
+  evidence-bundle:
+    description: Extracted evidence artifact directory
+    required: true
+  head-sha:
+    description: Expected PR head SHA
+    required: true
+  pull-request:
+    description: Expected PR number
+    required: true
+  review-output:
+    description: Output advisory Markdown
+    default: codex-review/review.md
+outputs:
+  status:
+    description: completed, not_configured or failed
+    value: ${{ steps.review.outputs.status }}
+runs:
+  using: composite
+  steps:
+    - name: Install pinned Codex CLI
+      if: inputs.codex-auth-json != ''
+      shell: bash
+      run: npm install --prefix "$RUNNER_TEMP/exhibit-codex-cli" --no-audit --no-fund @openai/codex@0.164.0
+    - name: Prepare disposable Linux sandbox
+      if: inputs.codex-auth-json != ''
+      shell: bash
+      env:
+        REVIEW_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+      run: |
+        test "$REVIEW_RUNNER_ENVIRONMENT" = github-hosted
+        if [ -f /proc/sys/kernel/unprivileged_userns_clone ]; then
+          sudo sysctl -w kernel.unprivileged_userns_clone=1
+        fi
+        if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+        fi
+    - name: Create unprivileged review account
+      if: inputs.codex-auth-json != ''
+      shell: bash
+      run: sudo useradd --system --user-group --create-home --shell /usr/sbin/nologin exhibit-review
+    - id: review
+      shell: bash
+      env:
+        EXHIBIT_ACTION_PATH: ${{ github.action_path }}
+        CODEX_AUTH_JSON: ${{ inputs.codex-auth-json }}
+        EVIDENCE_BUNDLE: ${{ inputs.evidence-bundle }}
+        EXPECTED_SHA: ${{ inputs.head-sha }}
+        EXPECTED_PR: ${{ inputs.pull-request }}
+        EXPECTED_RUN_ID: ${{ github.run_id }}
+        EXPECTED_ATTEMPT: ${{ github.run_attempt }}
+        REVIEW_OUTPUT: ${{ inputs.review-output }}
+      run: |
+        export CODEX_BINARY="$RUNNER_TEMP/exhibit-codex-cli/node_modules/.bin/codex"
+        python3 "$EXHIBIT_ACTION_PATH/../../../scripts/codex_evidence_review.py"

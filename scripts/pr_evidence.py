@@ -46,6 +46,17 @@ def collect(event, playwright, root, run_id, attempt):
                    pull_request=pr["number"], flow_id="checkout.saved-address")
 
 
+
+def recording_index(manifest):
+    """Index original video bytes without claiming playback or independent trust."""
+    return {"schemaVersion": 1, "sample": True, "verification": "unverified",
+            "repository": manifest["repository"], "pullRequest": manifest["pullRequest"],
+            "headSha": manifest["headSha"], "runId": manifest["runId"],
+            "attempt": manifest["attempt"],
+            "recordings": [artifact.copy() for artifact in manifest["artifacts"]
+                           if artifact["mediaType"] in ("video/webm", "video/mp4")]}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("gate", "collect"))
@@ -69,8 +80,14 @@ def main():
         output.write_text(json.dumps(manifest, indent=2) + "\n")
         markdown = report(manifest, bytes_checked=True)
         output.with_suffix(".md").write_text(markdown)
+        index = recording_index(manifest)
+        output.with_name("recordings.json").write_text(json.dumps(index, indent=2) + "\n")
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
             summary.write(markdown)
+            summary.write(f"\n### Video recordings\n\n{len(index['recordings'])} original recording(s) indexed in `recordings.json`. "
+                          "Paths are relative to the uploaded `test-results/` directory.\n")
+        require(os.environ.get("REQUIRE_VIDEO", "false") == "false" or index["recordings"],
+                "video recording was required but no video artifact was produced")
         # Collection success is separate from browser failure, preserved by the caller.
         return 0
     except (InvalidEvidence, OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
