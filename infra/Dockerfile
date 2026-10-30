@@ -19,7 +19,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.commitSHA=${COMMIT_
     CGO_ENABLED=0 go build -trimpath -o /out/migrate ./services/api/cmd/migrate && \
     CGO_ENABLED=0 go build -trimpath -o /out/bootstrap-user ./services/api/cmd/bootstrap-user
 
-FROM alpine:3.22
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates && addgroup -S exhibit && adduser -S -G exhibit exhibit
 RUN mkdir -p /var/lib/exhibit/artifacts && chown -R exhibit:exhibit /var/lib/exhibit
 WORKDIR /app
