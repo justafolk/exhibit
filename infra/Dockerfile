@@ -8,7 +8,7 @@ COPY apps/web apps/web
 COPY packages/contracts packages/contracts
 RUN npm run build
 
-FROM golang:1.27.3-alpine AS api
+FROM golang:1.27.4-alpine AS api
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
