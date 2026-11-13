@@ -24,7 +24,7 @@
     "evidence:record": "python3 scripts/record_evidence.py"
   },
   "devDependencies": {
-    "@playwright/test": "1.64.1",
+    "@playwright/test": "1.65.0",
     "prettier": "3.9.10"
   }
 }
